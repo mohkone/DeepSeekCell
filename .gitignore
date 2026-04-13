@@ -1,0 +1,33 @@
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Data files (large, or user-provided)
+data/cl.obo
+scType/ScTypeDB_full.xlsx
+
+# Environment variables
+.Renviron
+
+# R package artifacts
+*.tar.gz
+*.Rcheck/
+
+# macOS
+.DS_Store
+
+# Output files
+benchmark_results.csv
+benchmark_plot.pdf
+unmatched_celltypes.log
+annotation_*.csv
+annotation_*.xlsx
+annotation_*.html
+confidence_plot.png
+
+# Temporary files
+*.tmp
+*.log
