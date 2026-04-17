@@ -110,36 +110,65 @@ run_singler <- function(seu, dataset_name) {
   message("    Running SingleR for ", dataset_name, "...")
   sce <- as.SingleCellExperiment(seu)
   ref <- NULL
+  
   if (dataset_name == "PBMC") {
-    ref <- tryCatch(celldex::MonacoImmuneData(), error = function(e) NULL)
+    if (exists("ref_pbmc", envir = .GlobalEnv)) {
+      ref <- get("ref_pbmc", envir = .GlobalEnv)
+    }
   } else if (dataset_name == "Pancreas") {
-    ref <- tryCatch(celldex::BaronPancreasData(), error = function(e) NULL)
-    if (is.null(ref)) {
-      message("      BaronPancreasData failed, trying HumanPrimaryCellAtlasData...")
-      ref <- tryCatch(celldex::HumanPrimaryCellAtlasData(), error = function(e) NULL)
+    if (exists("ref_pancreas", envir = .GlobalEnv)) {
+      ref <- get("ref_pancreas", envir = .GlobalEnv)
+      if (!"label.main" %in% colnames(colData(ref))) {
+        colData(ref)$label.main <- colData(ref)$label
+      }
     }
   } else if (dataset_name == "Brain") {
-    ref <- tryCatch(celldex::MouseRNAseqData(), error = function(e) NULL)
+    if (exists("ref_brain", envir = .GlobalEnv)) {
+      ref <- get("ref_brain", envir = .GlobalEnv)
+    }
   }
+  
   if (is.null(ref)) {
-    message("      Reference loading failed, returning 'Unknown' for all cells.")
+    warning("Reference not available for ", dataset_name)
     return(rep("Unknown", ncol(seu)))
   }
-  if (!"logcounts" %in% assayNames(ref)) ref <- scuttle::logNormCounts(ref)
+  
+  # Ensure logcounts are present
+  if (!"logcounts" %in% assayNames(ref)) {
+    ref <- scuttle::logNormCounts(ref)
+  }
+  if (!"logcounts" %in% assayNames(sce)) {
+    sce <- scuttle::logNormCounts(sce)
+  }
+  
+  # Remove NA labels
   keep <- !is.na(ref$label.main)
   ref <- ref[, keep]
-  if (ncol(ref) == 0) {
-    message("      Reference has no valid cells after NA removal")
-    return(rep("Unknown", ncol(seu)))
+  
+  # Check gene intersection
+  common_genes <- intersect(rownames(sce), rownames(ref))
+  message("      Common genes between test and reference: ", length(common_genes))
+  
+  if (length(common_genes) < 100) {
+    warning("      Too few common genes (", length(common_genes), "). SingleR may fail.")
   }
+  
+  # Subset both to common genes
+  sce <- sce[common_genes, ]
+  ref <- ref[common_genes, ]
+  
   pred <- tryCatch({
     SingleR(test = sce, ref = ref, labels = ref$label.main,
-            assay.type.test = "logcounts")
+            assay.type.test = "logcounts", assay.type.ref = "logcounts")
   }, error = function(e) {
-    message("      SingleR failed: ", e$message)
+    message("      SingleR error: ", e$message)
     return(NULL)
   })
-  if (is.null(pred)) return(rep("Unknown", ncol(seu)))
+  
+  if (is.null(pred)) {
+    return(rep("Unknown", ncol(seu)))
+  }
+  
   pred_labels <- as.character(pred$pruned.labels)
   pred_labels[is.na(pred_labels)] <- "Unknown"
   return(pred_labels)

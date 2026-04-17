@@ -52,6 +52,25 @@ run_benchmark_wrapper <- function(dataset_name, data, method, ont_data, db_file,
   evaluate_metrics(pred, truth_aligned, dataset_name, ont_data)
 }
 
+# Load pre-downloaded references (manual workaround for China)
+if (file.exists("data/MonacoImmuneData.RData")) {
+  load("data/MonacoImmuneData.RData")
+} else {
+  warning("MonacoImmuneData.RData not found. SingleR on PBMC will fail.")
+}
+
+if (file.exists("data/BaronPancreasData.RData")) {
+  load("data/BaronPancreasData.RData")
+} else {
+  warning("BaronPancreasData.RData not found. SingleR on Pancreas will fail.")
+}
+
+if (file.exists("data/MouseRNAseqData.RData")) {
+  load("data/MouseRNAseqData.RData")
+} else {
+  warning("MouseRNAseqData.RData not found. SingleR on Brain will fail.")
+}
+
 main <- function() {
   ont_data <- load_cell_ontology(ONTOLOGY_FILE)
   sctype_db_path <- find_sctype_db()

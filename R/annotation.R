@@ -1,3 +1,4 @@
+# R/annotation.R
 #' Core annotation orchestration
 #'
 #' Coordinates the entire cell type annotation pipeline from marker genes
@@ -12,6 +13,10 @@
 #' @param validate Whether to perform validation
 #' @return Comprehensive result object
 #' @export
+
+# Define null coalescing operator
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
 annotate_cell_types <- function(markers,
                                 tissue,
                                 species = "Human",
@@ -72,7 +77,7 @@ annotate_cell_types <- function(markers,
   # Metadata
   total_time <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
   tokens <- api_result$usage$total_tokens %||% 0
-  cost <- tokens / 1000 * model_config$cost_per_1k_tokens
+  cost <- (tokens / 1000) * (model_config$cost_per_1k_tokens %||% 0)
   
   list(
     success = TRUE,
