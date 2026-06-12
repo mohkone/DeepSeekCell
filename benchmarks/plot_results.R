@@ -19,3 +19,5 @@ plot_benchmark <- function(results_csv = "benchmark_results.csv",
   message("Plot saved to ", output_pdf)
   invisible(p)
 }
+
+

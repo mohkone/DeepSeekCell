@@ -6,6 +6,8 @@
 #' 
 #' @param annotations_df Data frame of annotations
 #' @param thresholds List of validation thresholds
+#' @param markers Optional normalized marker list used to generate annotations.
+#' @param metadata Optional run metadata.
 #' @return Validation result object
 #' @export
 validate_annotations <- function(annotations_df, 
@@ -13,9 +15,17 @@ validate_annotations <- function(annotations_df,
                                    min_confidence = 0.5,
                                    max_unknown_rate = 0.3,
                                    min_ontology_coverage = 0.5
-                                 )) {
+                                 ),
+                                 markers = NULL,
+                                 metadata = NULL) {
+  default_thresholds <- list(
+    min_confidence = 0.5,
+    max_unknown_rate = 0.3,
+    min_ontology_coverage = 0.5
+  )
+  thresholds <- utils::modifyList(default_thresholds, thresholds)
   
-  if (nrow(annotations_df) == 0) {
+  if (!is.data.frame(annotations_df) || nrow(annotations_df) == 0) {
     return(list(
       valid = FALSE,
       issues = "No annotations to validate",
@@ -25,6 +35,21 @@ validate_annotations <- function(annotations_df,
   
   issues <- c()
   warnings <- c()
+
+  required_cols <- c("Cluster", "CellType", "Confidence")
+  missing_cols <- setdiff(required_cols, colnames(annotations_df))
+
+  if (length(missing_cols) > 0) {
+    return(list(
+      valid = FALSE,
+      issues = paste("Annotation table is missing required columns:", paste(missing_cols, collapse = ", ")),
+      warnings = character(),
+      summary = data.frame(),
+      timestamp = Sys.time()
+    ))
+  }
+
+  annotations_df$Confidence <- as_confidence(annotations_df$Confidence)
   
   # Check confidence scores
   low_conf <- sum(annotations_df$Confidence < thresholds$min_confidence, na.rm = TRUE)
@@ -44,6 +69,7 @@ validate_annotations <- function(annotations_df,
   }
   
   # Check ontology coverage
+  ontology_coverage <- NA_real_
   if ("CL_ID" %in% colnames(annotations_df)) {
     ontology_missing <- sum(is.na(annotations_df$CL_ID))
     ontology_coverage <- 1 - (ontology_missing / nrow(annotations_df))
@@ -58,22 +84,67 @@ validate_annotations <- function(annotations_df,
   if (any(duplicated(annotations_df$Cluster))) {
     issues <- c(issues, "Duplicate cluster names found")
   }
+
+  if (!is.null(markers)) {
+    missing_marker_clusters <- setdiff(annotations_df$Cluster, names(markers))
+    missing_annotation_clusters <- setdiff(names(markers), annotations_df$Cluster)
+
+    if (length(missing_marker_clusters) > 0) {
+      warnings <- c(
+        warnings,
+        sprintf(
+          "%d annotated clusters were not present in the marker input",
+          length(missing_marker_clusters)
+        )
+      )
+    }
+
+    if (length(missing_annotation_clusters) > 0) {
+      issues <- c(
+        issues,
+        sprintf(
+          "%d marker clusters are missing annotations",
+          length(missing_annotation_clusters)
+        )
+      )
+    }
+  }
+
+  mean_confidence <- mean(annotations_df$Confidence, na.rm = TRUE)
+  if (is.nan(mean_confidence)) mean_confidence <- NA_real_
+
+  mixed_rate <- if ("IsMixed" %in% colnames(annotations_df)) {
+    mean(as_flag(annotations_df$IsMixed), na.rm = TRUE)
+  } else {
+    NA_real_
+  }
+
+  summary <- data.frame(
+    n_clusters = nrow(annotations_df),
+    mean_confidence = mean_confidence,
+    min_confidence = min(annotations_df$Confidence, na.rm = TRUE),
+    max_confidence = max(annotations_df$Confidence, na.rm = TRUE),
+    unknown_rate = unknown_rate,
+    mixed_rate = mixed_rate,
+    ontology_coverage = ontology_coverage,
+    stringsAsFactors = FALSE
+  )
+
+  summary$min_confidence[is.infinite(summary$min_confidence)] <- NA_real_
+  summary$max_confidence[is.infinite(summary$max_confidence)] <- NA_real_
   
-  list(
+  result <- list(
     valid = length(issues) == 0,
     issues = issues,
     warnings = warnings,
-    summary = data.frame(
-      n_clusters = nrow(annotations_df),
-      mean_confidence = mean(annotations_df$Confidence, na.rm = TRUE),
-      unknown_rate = unknown_count / nrow(annotations_df),
-      ontology_coverage = ifelse("CL_ID" %in% colnames(annotations_df),
-                                 sum(!is.na(annotations_df$CL_ID)) / nrow(annotations_df),
-                                 NA),
-      stringsAsFactors = FALSE
-    ),
+    summary = summary,
+    thresholds = thresholds,
+    metadata = metadata,
     timestamp = Sys.time()
   )
+
+  result$quality_score <- calculate_quality_score(result)
+  result
 }
 
 #' Quality control score for annotations

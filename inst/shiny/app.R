@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# DeepSeekCell Shiny Application – Publication Version
+# DeepSeekCell Shiny Application - Publication Version
 suppressPackageStartupMessages({
   library(shiny)
   library(shinythemes)
@@ -7,18 +7,77 @@ suppressPackageStartupMessages({
   library(DT)
   library(ggplot2)
   library(plotly)
-  library(dplyr)
 })
 
-# Source R functions (exclude benchmark scripts)
-r_dir <- file.path("..", "..", "R")
-if (!dir.exists(r_dir)) r_dir <- "R"
-r_files <- list.files(r_dir, pattern = "\\.R$", full.names = TRUE)
-r_files <- r_files[!grepl("benchmark|^main\\.R$", basename(r_files))]
-for (f in r_files) source(f, local = TRUE)
+source_deepseekcell_functions <- function() {
+  candidate_dirs <- c(
+    file.path("..", "..", "R"),
+    "R",
+    normalizePath(file.path(getwd(), "..", "..", "R"), mustWork = FALSE)
+  )
 
-# Define %||% operator if not already present
-`%||%` <- function(x, y) if (is.null(x)) y else x
+  r_dir <- candidate_dirs[dir.exists(candidate_dirs)][1]
+  if (is.na(r_dir)) {
+    stop("Could not locate the package R/ directory.", call. = FALSE)
+  }
+
+  r_files <- list.files(r_dir, pattern = "\\.R$", full.names = TRUE)
+  r_files <- r_files[!grepl("benchmark|^main\\.R$", basename(r_files))]
+
+  priority <- file.path(r_dir, c("utils.R", "api.R"))
+  ordered_files <- c(priority[file.exists(priority)], setdiff(r_files, priority))
+  invisible(lapply(ordered_files, source, local = FALSE))
+}
+
+source_deepseekcell_functions()
+
+format_display_label <- function(x) {
+  x <- gsub("_", " ", trimws(as.character(x)), fixed = TRUE)
+  x <- tolower(x)
+  tools::toTitleCase(x)
+}
+
+format_tissue_badge <- function(x) {
+  x <- tolower(trimws(as.character(x)))
+
+  css_class <- if (x == "expected") {
+    "badge-expected"
+  } else if (x %in% c("possible_contamination", "unexpected")) {
+    "badge-contamination"
+  } else if (x %in% c("possible_doublet", "doublet")) {
+    "badge-doublet"
+  } else {
+    "badge-unknown"
+  }
+
+  sprintf('<span class="%s">%s</span>', css_class, format_display_label(x))
+}
+
+format_mixed_badge <- function(x) {
+  ifelse(
+    as.logical(x),
+    '<span class="badge-doublet">Mixed</span>',
+    '<span class="badge-expected">Single</span>'
+  )
+}
+
+format_column_names <- function(x) {
+  labels <- c(
+    Cluster = "Cluster",
+    CellType = "Cell Type",
+    Confidence = "Confidence",
+    TissueConsistency = "Tissue Consistency",
+    IsMixed = "Mixed",
+    CL_ID = "CL ID",
+    OntologyLabel = "Ontology Label",
+    MatchMethod = "Match Method",
+    OntologyMatchScore = "Ontology Match Score",
+    Markers = "Marker Genes",
+    Reasoning = "Reasoning"
+  )
+
+  unname(ifelse(x %in% names(labels), labels[x], x))
+}
 
 ui <- fluidPage(
   theme = shinytheme("flatly"),
@@ -34,15 +93,69 @@ ui <- fluidPage(
     }
     .metric-value { font-size: 24px; font-weight: bold; color: #2c3e50; }
     .metric-label { font-size: 12px; color: #7f8c8d; margin-top: 5px; }
+    .badge-expected {
+  background-color: #27ae60;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+}
+
+.badge-contamination {
+  background-color: #e67e22;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+}
+
+.badge-doublet {
+  background-color: #8e44ad;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+}
+
+.badge-unknown {
+  background-color: #7f8c8d;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+}
+    .reasoning-cell {
+      max-width: 420px;
+      white-space: normal;
+      line-height: 1.35;
+    }
+    .ontology-link {
+      font-family: monospace;
+      white-space: nowrap;
+    }
+    .marker-cell,
+    .reasoning-cell {
+      max-width: 520px;
+      white-space: normal;
+      line-height: 1.35;
+    }
+    table.dataTable td {
+      vertical-align: middle;
+    }
   "))),
   div(class = "text-center", style = "background-color: #2c3e50; color: white; padding: 20px;",
-      h1("🧬 DeepSeekCell", span(class = "live-badge", "LIVE MODE")),
-      h4("AI-Powered Cell Type Annotation with Ontology-Aware Reasoning"),
-      p("Version 2.0 | For research use only")),
+      h1("DeepSeekCell", span(class = "live-badge", "LIVE MODE")),
+      h4("Ontology-Guided LLM Framework for Explainable Cell Type Annotation"),
+      p(paste("Version", deepseekcell_version(), "| For research use only"))),
   sidebarLayout(
     sidebarPanel(width = 4,
-                 textInput("api_key", "API Key", placeholder = "sk-..."),
-                 selectInput("model", "Model", choices = c("DeepSeek" = "deepseek", "GPT-4o" = "gpt4")),
+                 passwordInput("api_key", "API Key", placeholder = "sk-..."),
+                 selectInput("model", "Model", choices = c("DeepSeek" = "deepseek", "Ollama (local)" = "ollama")),
+                 # In UI, after selectInput, add:
+                 conditionalPanel(
+                   condition = "input.model == 'ollama'",
+                   helpText("Ollama must be running locally (http://localhost:11434). No API key needed.")
+                 ),
                  textInput("tissue", "Tissue", value = "PBMC"),
                  selectInput("species", "Species", choices = c("Human", "Mouse", "Rat")),
                  checkboxInput("use_ontology", "Map to Cell Ontology", value = TRUE),
@@ -64,14 +177,15 @@ ui <- fluidPage(
               tabsetPanel(
                 tabPanel("Results",
                          br(),
-                         DTOutput("results_table") %>% withSpinner(),
+                         withSpinner(DTOutput("results_table")),
                          br(),
                          fluidRow(
                            column(4, downloadButton("download_csv", "CSV", class = "btn-success", width = "100%")),
                            column(4, downloadButton("download_xlsx", "Excel", class = "btn-success", width = "100%")),
                            column(4, downloadButton("download_report", "HTML Report", class = "btn-info", width = "100%"))
                          )),
-                tabPanel("Confidence", br(), plotlyOutput("confidence_plot") %>% withSpinner()),
+                tabPanel("Explainability", br(), withSpinner(DTOutput("explainability_table"))),
+                tabPanel("Confidence", br(), withSpinner(plotlyOutput("confidence_plot"))),
                 tabPanel("Cost & Performance", br(),
                          fluidRow(
                            column(4, uiOutput("cost_metric")),
@@ -89,9 +203,9 @@ ui <- fluidPage(
                          div(class = "well",
                              h4("How to Use DeepSeekCell"),
                              tags$ol(
-                               tags$li("Enter your API key for DeepSeek or GPT-4o."),
+                                tags$li("Enter your DeepSeek API key, or choose Ollama for local annotation."),
                                tags$li("Specify tissue and species."),
-                               tags$li("Input marker genes for up to 5 clusters (comma‑separated)."),
+                               tags$li("Input marker genes for up to 5 clusters (comma-, semicolon-, or newline-separated)."),
                                tags$li("Click 'Annotate' and wait 15–30 seconds."),
                                tags$li("Download results as CSV, Excel, or HTML report.")
                              ),
@@ -102,7 +216,7 @@ ui <- fluidPage(
                              ),
                              h4("Citation"),
                              p("If you use DeepSeekCell, please cite:"),
-                             p(tags$em("DeepSeekCell: Benchmarking Large Language Model‑Powered Cell Type Annotation with Ontology‑Aware Evaluation and an Interactive Shiny Application. Computers in Biology and Medicine, 2026."))
+                             p(tags$em("An Ontology-Guided Large Language Model Framework and Interactive Shiny Platform for Explainable Cell Type Annotation in Single-Cell RNA Sequencing."))
                          ))
               )
     )
@@ -111,6 +225,22 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   values <- reactiveValues(result = NULL)
+
+  collect_markers <- reactive({
+    markers <- list()
+    for (i in 1:5) {
+      txt <- input[[paste0("c", i)]]
+      if (!is.null(txt) && nchar(trimws(txt)) > 0) {
+        genes <- split_marker_text(txt)
+        if (length(genes) > 0) markers[[paste0("Cluster", i)]] <- genes
+      }
+    }
+    if (length(markers) == 0) {
+      showNotification("Enter at least one cluster.", type = "error")
+      return(NULL)
+    }
+    markers
+  })
   
   observeEvent(input$example_pbmc, {
     updateTextAreaInput(session, "c1", value = "CD3D, CD3E, CD8A, CD4, CD247")
@@ -134,29 +264,15 @@ server <- function(input, output, session) {
     for (i in 1:5) updateTextAreaInput(session, paste0("c", i), value = "")
   })
   
-  collect_markers <- reactive({
-    markers <- list()
-    for (i in 1:5) {
-      txt <- input[[paste0("c", i)]]
-      if (!is.null(txt) && nchar(trimws(txt)) > 0) {
-        genes <- trimws(unlist(strsplit(txt, ",")))
-        genes <- genes[genes != ""]
-        if (length(genes) > 0) markers[[paste0("Cluster", i)]] <- genes
-      }
-    }
-    if (length(markers) == 0) {
-      showNotification("Enter at least one cluster.", type = "error")
-      return(NULL)
-    }
-    markers
-  })
-  
   observeEvent(input$run, {
     markers <- collect_markers()
     if (is.null(markers)) return()
     
-    if (is.null(input$api_key) || input$api_key == "") {
-      showNotification("API key is required.", type = "error")
+    model_config <- get_model_config(input$model)
+    api_key_to_use <- resolve_api_key(model_config, input$api_key)
+
+    if (isTRUE(model_config$requires_api_key) && is.null(api_key_to_use)) {
+      showNotification("API key is required for this model.", type = "error")
       return()
     }
     
@@ -168,8 +284,8 @@ server <- function(input, output, session) {
         markers = markers,
         tissue = input$tissue,
         species = input$species,
-        model_name = input$model,          # FIXED: was input$44model
-        api_key = input$api_key,
+        model_name = input$model,
+        api_key = api_key_to_use,
         use_ontology = input$use_ontology,
         validate = TRUE
       ),
@@ -177,7 +293,13 @@ server <- function(input, output, session) {
     )
     removeNotification(id = "status")
     values$result <- res
+    if (isTRUE(res$success)) {
+      showNotification("Annotation completed successfully.", type = "message")
+    } else {
+      showNotification(paste("Annotation failed:", res$error), type = "error")
+    }
   })
+  
   
   # Metric boxes
   render_metric_box <- function(value, subtitle, color = "blue") {
@@ -209,16 +331,211 @@ server <- function(input, output, session) {
   })
   
   output$results_table <- renderDT({
+    
     req(values$result$success)
+    
     df <- values$result$annotations
-    df$Confidence_Display <- sprintf('<span class="%s">%.3f</span>',
-                                     ifelse(df$Confidence >= 0.7, "confidence-high",
-                                            ifelse(df$Confidence >= 0.4, "confidence-mid", "confidence-low")),
-                                     df$Confidence)
-    display_cols <- c("Cluster", "CellType", "Confidence_Display")
-    if ("CL_ID" %in% names(df)) display_cols <- c(display_cols, "CL_ID", "OntologyLabel")
-    datatable(df[, display_cols, drop = FALSE], escape = FALSE,
-              options = list(pageLength = 10), rownames = FALSE)
+
+    text_cols <- names(df)[vapply(df, is.character, logical(1))]
+    df[text_cols] <- lapply(df[text_cols], html_escape)
+    
+    df$Confidence <- sprintf(
+      '<span class="%s">%.3f</span>',
+      ifelse(
+        df$Confidence >= 0.7,
+        "confidence-high",
+        ifelse(df$Confidence >= 0.4, "confidence-mid", "confidence-low")
+      ),
+      as.numeric(df$Confidence)
+    )
+    
+    if ("TissueConsistency" %in% names(df)) {
+      df$TissueConsistency <- vapply(
+        df$TissueConsistency,
+        format_tissue_badge,
+        character(1)
+      )
+    }
+    
+    if ("IsMixed" %in% names(df)) {
+      df$IsMixed <- format_mixed_badge(df$IsMixed)
+    }
+
+    if ("CL_ID" %in% names(df)) {
+      df$CL_ID <- vapply(
+        df$CL_ID,
+        function(cl_id) {
+          cl_id <- trimws(as.character(cl_id))
+          if (!nzchar(cl_id)) {
+            return("")
+          }
+
+          url <- paste0(
+            "https://www.ebi.ac.uk/ols4/search?q=",
+            utils::URLencode(cl_id, reserved = TRUE),
+            "&ontology=cl"
+          )
+
+          sprintf(
+            '<a class="ontology-link" href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+            url,
+            cl_id
+          )
+        },
+        character(1)
+      )
+    }
+
+    if ("Reasoning" %in% names(df)) {
+      df$Reasoning <- ifelse(
+        nzchar(trimws(df$Reasoning)),
+        sprintf('<div class="reasoning-cell">%s</div>', df$Reasoning),
+        ""
+      )
+    }
+
+    if ("OntologyMatchScore" %in% names(df)) {
+      score <- suppressWarnings(as.numeric(df$OntologyMatchScore))
+      df$OntologyMatchScore <- ifelse(is.na(score), "", sprintf("%.3f", score))
+    }
+    
+    display_cols <- c("Cluster", "CellType", "Confidence")
+    
+    if ("TissueConsistency" %in% names(df)) {
+      display_cols <- c(display_cols, "TissueConsistency")
+    }
+    
+    if ("IsMixed" %in% names(df)) {
+      display_cols <- c(display_cols, "IsMixed")
+    }
+    
+    if ("CL_ID" %in% names(df)) {
+      display_cols <- c(display_cols, "CL_ID", "OntologyLabel")
+    }
+
+    dt_options <- list(
+      pageLength = 10,
+      autoWidth = TRUE,
+      scrollX = TRUE
+    )
+    
+    DT::datatable(
+      df[, display_cols, drop = FALSE],
+      escape = FALSE,
+      rownames = FALSE,
+      colnames = format_column_names(display_cols),
+      options = dt_options
+    )
+  })
+
+  output$explainability_table <- renderDT({
+    req(values$result$success)
+
+    df <- values$result$annotations
+
+    if (!is.null(values$result$markers)) {
+      marker_text <- vapply(
+        df$Cluster,
+        function(cluster_name) {
+          genes <- values$result$markers[[cluster_name]]
+          if (is.null(genes) || length(genes) == 0) {
+            return("")
+          }
+          paste(genes, collapse = ", ")
+        },
+        character(1)
+      )
+      df$Markers <- marker_text
+    }
+
+    keep_cols <- c(
+      "Cluster", "CellType", "TissueConsistency", "IsMixed", "Markers",
+      "Reasoning", "CL_ID", "OntologyLabel", "MatchMethod", "OntologyMatchScore"
+    )
+    keep_cols <- intersect(keep_cols, names(df))
+    df <- df[, keep_cols, drop = FALSE]
+
+    text_cols <- names(df)[vapply(df, is.character, logical(1))]
+    df[text_cols] <- lapply(df[text_cols], html_escape)
+
+    if ("TissueConsistency" %in% names(df)) {
+      df$TissueConsistency <- vapply(
+        df$TissueConsistency,
+        format_tissue_badge,
+        character(1)
+      )
+    }
+
+    if ("IsMixed" %in% names(df)) {
+      df$IsMixed <- format_mixed_badge(df$IsMixed)
+    }
+
+    if ("CL_ID" %in% names(df)) {
+      df$CL_ID <- vapply(
+        df$CL_ID,
+        function(cl_id) {
+          cl_id <- trimws(as.character(cl_id))
+          if (!nzchar(cl_id)) {
+            return("")
+          }
+
+          url <- paste0(
+            "https://www.ebi.ac.uk/ols4/search?q=",
+            utils::URLencode(cl_id, reserved = TRUE),
+            "&ontology=cl"
+          )
+
+          sprintf(
+            '<a class="ontology-link" href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+            url,
+            cl_id
+          )
+        },
+        character(1)
+      )
+    }
+
+    if ("Markers" %in% names(df)) {
+      df$Markers <- ifelse(
+        nzchar(trimws(df$Markers)),
+        sprintf('<div class="marker-cell">%s</div>', df$Markers),
+        ""
+      )
+    }
+
+    if ("Reasoning" %in% names(df)) {
+      df$Reasoning <- ifelse(
+        nzchar(trimws(df$Reasoning)),
+        sprintf('<div class="reasoning-cell">%s</div>', df$Reasoning),
+        ""
+      )
+    }
+
+    if ("OntologyMatchScore" %in% names(df)) {
+      score <- suppressWarnings(as.numeric(df$OntologyMatchScore))
+      df$OntologyMatchScore <- ifelse(is.na(score), "", sprintf("%.3f", score))
+    }
+
+    width_targets <- which(names(df) %in% c("Markers", "Reasoning")) - 1
+    dt_options <- list(
+      pageLength = 5,
+      autoWidth = TRUE,
+      scrollX = TRUE
+    )
+
+    if (length(width_targets) > 0) {
+      dt_options$columnDefs <- list(
+        list(width = "520px", targets = width_targets)
+      )
+    }
+
+    DT::datatable(
+      df,
+      escape = FALSE,
+      rownames = FALSE,
+      colnames = format_column_names(names(df)),
+      options = dt_options
+    )
   })
   
   output$confidence_plot <- renderPlotly({
@@ -255,8 +572,8 @@ server <- function(input, output, session) {
     v <- values$result$validation
     if (!is.null(v)) {
       cat("=== Validation Report ===\n\n")
-      if (v$valid) cat("✅ All checks passed.\n\n") else cat("❌ Issues found:\n", paste("•", v$issues), "\n")
-      if (length(v$warnings)) cat("⚠️ Warnings:\n", paste("•", v$warnings), "\n")
+      if (v$valid) cat("All checks passed.\n\n") else cat("Issues found:\n", paste("-", v$issues), "\n")
+      if (length(v$warnings)) cat("Warnings:\n", paste("-", v$warnings), "\n")
       cat("Summary Statistics:\n")
       print(v$summary)
     } else {
@@ -277,29 +594,32 @@ server <- function(input, output, session) {
   # Download handlers
   output$download_csv <- downloadHandler(
     filename = function() paste0("annotation_", Sys.Date(), ".csv"),
-    content = function(file) write.csv(values$result$annotations, file, row.names = FALSE)
+    content = function(file) {
+      req(values$result$success)
+      write.csv(values$result$annotations, file, row.names = FALSE)
+    }
   )
   
   output$download_xlsx <- downloadHandler(
     filename = function() paste0("annotation_", Sys.Date(), ".xlsx"),
     content = function(file) {
       req(values$result$success)
-      if (requireNamespace("openxlsx", quietly = TRUE)) {
-        wb <- openxlsx::createWorkbook()
-        openxlsx::addWorksheet(wb, "Annotations")
-        openxlsx::writeData(wb, "Annotations", values$result$annotations)
-        openxlsx::addWorksheet(wb, "Metadata")
-        metadata_df <- data.frame(Parameter = names(values$result$metadata),
-                                  Value = as.character(unlist(values$result$metadata)))
-        openxlsx::writeData(wb, "Metadata", metadata_df)
-        if (!is.null(values$result$validation)) {
-          openxlsx::addWorksheet(wb, "Validation")
-          openxlsx::writeData(wb, "Validation", values$result$validation$summary)
-        }
-        openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
-      } else {
-        write.csv(values$result$annotations, file, row.names = FALSE)
+      if (!requireNamespace("openxlsx", quietly = TRUE)) {
+        stop("Package 'openxlsx' is required for Excel export.", call. = FALSE)
       }
+
+      wb <- openxlsx::createWorkbook()
+      openxlsx::addWorksheet(wb, "Annotations")
+      openxlsx::writeData(wb, "Annotations", values$result$annotations)
+      openxlsx::addWorksheet(wb, "Metadata")
+      metadata_df <- data.frame(Parameter = names(values$result$metadata),
+                                Value = as.character(unlist(values$result$metadata)))
+      openxlsx::writeData(wb, "Metadata", metadata_df)
+      if (!is.null(values$result$validation)) {
+        openxlsx::addWorksheet(wb, "Validation")
+        openxlsx::writeData(wb, "Validation", values$result$validation$summary)
+      }
+      openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
     }
   )
   
@@ -307,30 +627,7 @@ server <- function(input, output, session) {
     filename = function() paste0("annotation_report_", Sys.Date(), ".html"),
     content = function(file) {
       req(values$result$success)
-      m <- values$result$metadata
-      summary_stats <- data.frame(
-        Metric = c("Tissue", "Species", "Model", "Number of Clusters",
-                   "Total Runtime (sec)", "API Latency (sec)", "Tokens Used",
-                   "Estimated Cost (USD)", "Mean Confidence"),
-        Value = c(
-          m$tissue, m$species, m$model, m$n_clusters,
-          sprintf("%.2f", m$total_runtime_sec),
-          sprintf("%.2f", m$api_latency_sec),
-          m$tokens_used,
-          sprintf("$%.4f", m$estimated_cost_usd),
-          sprintf("%.3f", mean(values$result$annotations$Confidence, na.rm = TRUE))
-        )
-      )
-      html_content <- sprintf(
-        '<!DOCTYPE html><html><head><title>DeepSeekCell Report</title>
-        <style>body{font-family:Arial;margin:40px}h1{color:#2c3e50}table{border-collapse:collapse;width:100%%}th,td{border:1px solid #ddd;padding:8px}th{background:#3498db;color:#fff}</style>
-        </head><body><h1>🧬 DeepSeekCell Annotation Report</h1><p>%s</p>
-        <h2>Summary</h2><div>%s</div><h2>Annotations</h2>%s</body></html>',
-        Sys.time(),
-        paste(sprintf("<b>%s:</b> %s<br>", summary_stats$Metric, summary_stats$Value), collapse = "\n"),
-        knitr::kable(values$result$annotations, format = "html")
-      )
-      writeLines(html_content, file)
+      generate_html_report(values$result, output_file = file)
     }
   )
 }

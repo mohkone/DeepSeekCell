@@ -9,6 +9,9 @@
 #' @return Processed markers list
 #' @export
 process_cell_data <- function(input, top_genes = 15) {
+  if (!is.numeric(top_genes) || length(top_genes) != 1 || is.na(top_genes) || top_genes < 1) {
+    stop("top_genes must be a positive numeric scalar.", call. = FALSE)
+  }
   
   markers <- .parse_input(input, top_genes)
   
@@ -21,9 +24,15 @@ process_cell_data <- function(input, top_genes = 15) {
   
   # Remove empty clusters
   markers <- markers[lengths(markers) > 0]
+
+  if (length(markers) == 0) {
+    stop("No valid marker genes remained after filtering.", call. = FALSE)
+  }
   
-  message("Processed {length(markers)} clusters with average ",
-           "{round(mean(sapply(markers, length)))} markers per cluster")
+  message(
+    "Processed ", length(markers), " clusters with average ",
+    round(mean(lengths(markers))), " markers per cluster"
+  )
   
   list(
     markers = markers,
@@ -37,12 +46,13 @@ process_cell_data <- function(input, top_genes = 15) {
   if (is.list(input)) {
     # Named list of marker vectors
     markers <- lapply(input, function(x) {
-      if (is.character(x)) {
-        genes <- unlist(strsplit(x, ","))
-        genes <- trimws(genes)
-        return(head(genes[genes != ""], top_genes))
+      genes <- if (is.character(x) && length(x) == 1) {
+        split_marker_text(x)
+      } else {
+        unique(trimws(as.character(x)))
       }
-      return(head(x, top_genes))
+
+      head(genes[!is.na(genes) & nzchar(genes)], top_genes)
     })
     
   } else if (is.data.frame(input)) {
@@ -56,7 +66,7 @@ process_cell_data <- function(input, top_genes = 15) {
     
   } else if (is.character(input)) {
     # Single vector of markers
-    markers <- list(Cluster1 = head(trimws(unlist(strsplit(input, ","))), top_genes))
+    markers <- list(Cluster1 = head(split_marker_text(input), top_genes))
     
   } else {
     stop("Unsupported input type. Use list, data.frame, or character vector.")
@@ -95,8 +105,16 @@ seurat_markers_to_list <- function(seurat_markers, top_n = 15) {
     stop("Seurat markers must have 'cluster' and 'gene' columns")
   }
   
-  # Get top markers by avg_log2FC
-  seurat_markers <- seurat_markers[order(seurat_markers$avg_log2FC, decreasing = TRUE), ]
+  effect_col <- intersect(c("avg_log2FC", "avg_logFC"), colnames(seurat_markers))[1]
+  if (is.na(effect_col)) {
+    stop("Seurat markers must contain avg_log2FC or avg_logFC.", call. = FALSE)
+  }
+
+  if ("p_val_adj" %in% colnames(seurat_markers)) {
+    seurat_markers <- seurat_markers[is.na(seurat_markers$p_val_adj) | seurat_markers$p_val_adj < 0.05, ]
+  }
+
+  seurat_markers <- seurat_markers[order(seurat_markers$cluster, -seurat_markers[[effect_col]]), ]
   
   markers_list <- split(seurat_markers$gene, seurat_markers$cluster)
   markers_list <- lapply(markers_list, head, top_n)

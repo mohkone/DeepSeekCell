@@ -7,28 +7,33 @@
 #' @param markers Character vector or list of marker genes
 #' @param tissue Tissue name
 #' @param api_key API key (optional, uses env var if not provided)
-#' @param model Model to use ("deepseek" or "gpt4")
+#' @param model Model to use ("deepseek" or "ollama")
+#' @param species Species name.
 #' @return Annotation result object
 #' @export
-quick_annotate <- function(markers, tissue, api_key = NULL, model = "deepseek") {
+quick_annotate <- function(markers, tissue, api_key = NULL, model = "deepseek", species = "Human") {
   
   # Convert single vector to list
   if (is.character(markers) && !is.list(markers)) {
     markers <- list(Cluster1 = markers)
   }
   
-  # Get API key from environment if not provided
-  if (is.null(api_key)) {
-    api_key <- Sys.getenv(paste0(toupper(model), "_API_KEY"))
-    if (api_key == "") {
-      stop("API key not found. Provide api_key or set ", 
-           toupper(model), "_API_KEY environment variable")
-    }
+  model_config <- get_model_config(model)
+  api_key <- resolve_api_key(model_config, api_key)
+
+  if (isTRUE(model_config$requires_api_key) && (is.null(api_key) || !nzchar(api_key))) {
+    env_hint <- paste(model_config$api_key_env %||% character(), collapse = ", ")
+    stop(
+      "API key not found. Provide api_key or set one of: ",
+      env_hint,
+      call. = FALSE
+    )
   }
   
   annotate_cell_types(
     markers = markers,
     tissue = tissue,
+    species = species,
     model_name = model,
     api_key = api_key,
     use_ontology = TRUE,
@@ -60,7 +65,7 @@ annotate_seurat <- function(seurat_obj, tissue, api_key = NULL,
   markers_list <- seurat_markers_to_list(markers, top_n = top_markers)
   
   # Annotate
-  quick_annotate(markers_list, tissue, api_key, model)
+  quick_annotate(markers_list, tissue, api_key, model, species = "Human")
 }
 
 #' Batch annotate multiple samples
@@ -71,25 +76,34 @@ annotate_seurat <- function(seurat_obj, tissue, api_key = NULL,
 #' @return List of annotation results
 #' @export
 batch_annotate <- function(samples, api_key = NULL, model = "deepseek") {
+  if (!is.list(samples) || length(samples) == 0) {
+    stop("samples must be a non-empty list.", call. = FALSE)
+  }
   
   results <- list()
   
-  for (sample_name in names(samples)) {
+  sample_names <- names(samples) %||% paste0("sample", seq_along(samples))
+
+  for (sample_name in sample_names) {
     cat("Processing sample:", sample_name, "\n")
     
     sample_data <- samples[[sample_name]]
+    if (is.null(sample_data)) {
+      sample_data <- samples[[which(sample_names == sample_name)[1]]]
+    }
     
     result <- quick_annotate(
       markers = sample_data$markers,
       tissue = sample_data$tissue %||% "Unknown",
       api_key = api_key,
-      model = model
+      model = model,
+      species = sample_data$species %||% "Human"
     )
     
     results[[sample_name]] <- result
   }
   
-  return(results)
+  results
 }
 
 #' Run annotation with progress tracking

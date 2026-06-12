@@ -1,32 +1,30 @@
 # benchmarks/config.R
-# Shared configuration for the benchmark
 
-# API keys – set in environment before running
 DEEPSEEK_KEY <- Sys.getenv("DEEPSEEK_API_KEY")
-OFOX_KEY     <- Sys.getenv("OFOX_API_KEY")
 
-if (DEEPSEEK_KEY == "" || OFOX_KEY == "") {
-  warning("API keys not set. LLM methods will be skipped.")
-}
+if (DEEPSEEK_KEY == "") warning("DEEPSEEK_API_KEY not set. DeepSeek will be skipped.")
 
 MODELS <- list(
   deepseek = list(
+    name = "DeepSeek",
     api_url = "https://api.deepseek.com/v1/chat/completions",
     model_id = "deepseek-chat",
     max_tokens = 2000,
-    temperature = 0.1
-  ),
-  gpt4 = list(
-    api_url = "https://api.ofox.ai/v1/chat/completions",
-    model_id = "openai/gpt-4o",
-    max_tokens = 2000,
-    temperature = 0.1
+    temperature = 0,
+    input_cost_per_1k = 0.00014,
+    output_cost_per_1k = 0.00028
   )
 )
 
-# Paths – relative to project root
 DATA_DIR <- "data"
 ONTOLOGY_FILE <- file.path(DATA_DIR, "cl.obo")
 SCTYPE_DB <- "scType/ScTypeDB_full.xlsx"
+
+TOP_MARKERS <- 25
+SEURAT_RESOLUTION <- 0.5
+N_PCS <- 50
+DEFAULT_BENCHMARK_REPLICATES <- 3
+BENCHMARK_CACHE_VERSION <- "2026-06-12-publication-v5"
+BENCHMARK_MODE <- "closed-label-marker-guided"
 
 set.seed(42)

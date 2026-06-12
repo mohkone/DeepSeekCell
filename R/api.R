@@ -1,56 +1,128 @@
-#' Unified API Handler for Multiple LLM Providers
-#' 
-#' Supports DeepSeek and GPT-4o (via Ofox.ai proxy for China)
-#' 
-#' @import httr2 jsonlite
+# R/api.R
+#' Unified API Handler for LLM Cell Type Annotation
+#'
+#' Supports DeepSeek and local Ollama endpoints.
+#'
+#' @importFrom httr2 request req_headers req_body_json req_perform resp_body_json req_timeout
+#' @importFrom jsonlite fromJSON
 
-# Model configurations
 MODELS <- list(
   deepseek = list(
     name = "DeepSeek-Chat",
     api_url = "https://api.deepseek.com/v1/chat/completions",
+    api_url_env = "DEEPSEEK_API_URL",
     model_id = "deepseek-chat",
-    max_tokens = 2000,   # Increased from 500
+    model_id_env = "DEEPSEEK_MODEL_ID",
+    max_tokens = 2000,
     temperature = 0.1,
-    cost_per_1k_tokens = 0.00014
+    cost_per_1k_tokens = 0.00014,
+    requires_api_key = TRUE,
+    api_key_env = "DEEPSEEK_API_KEY",
+    is_ollama = FALSE
   ),
-  gpt4 = list(
-    name = "GPT-4o",
-    api_url = "https://api.ofox.ai/v1/chat/completions",
-    model_id = "openai/gpt-4o",
-    max_tokens = 2000,   # Increased from 500
+  ollama = list(
+    name = "Ollama local",
+    api_url = "http://localhost:11434/api/generate",
+    api_url_env = "OLLAMA_API_URL",
+    model_id = "llama3.2:latest",
+    model_id_env = "OLLAMA_MODEL_ID",
+    max_tokens = 2000,
     temperature = 0.1,
-    cost_per_1k_tokens = 0.0025
+    cost_per_1k_tokens = 0,
+    requires_api_key = FALSE,
+    api_key_env = character(),
+    is_ollama = TRUE
   )
 )
 
-#' Get model configuration by name
-#' 
-#' @param model_name Model identifier ("deepseek" or "gpt4")
-#' @return Model configuration list or NULL if not found
-#' @export
-get_model_config <- function(model_name) {
-  return(MODELS[[model_name]])
+`%||%` <- function(x, y) {
+  if (is.null(x) || length(x) == 0) y else x
 }
 
-#' Call LLM API with retry logic and error handling
-#' 
-#' @param prompt User prompt for annotation
-#' @param model Model configuration list
-#' @param api_key API key for the service
-#' @param max_retries Maximum number of retry attempts
-#' @return List containing response content and metadata
+#' Get model configuration
+#' @param model_name Model identifier.
+#' @return Model configuration list.
 #' @export
-call_llm_api <- function(prompt, model, api_key, max_retries = 3) {
+get_model_config <- function(model_name) {
+  if (!model_name %in% names(MODELS)) {
+    stop(
+      "Unknown model: ", model_name,
+      ". Available models: ", paste(names(MODELS), collapse = ", "),
+      call. = FALSE
+    )
+  }
   
-  message("Calling ", model$name, " API...")
+  model <- MODELS[[model_name]]
+  api_url_override <- first_env(model$api_url_env %||% character())
+  model_id_override <- first_env(model$model_id_env %||% character())
+
+  if (nzchar(api_url_override)) {
+    if (grepl("/$", api_url_override) && !grepl("/chat/completions/?$", api_url_override)) {
+      api_url_override <- paste0(api_url_override, "chat/completions")
+    }
+    model$api_url <- api_url_override
+  }
+
+  if (nzchar(model_id_override)) {
+    model$model_id <- model_id_override
+  }
+
+  model
+}
+
+#' Resolve API key from explicit argument or documented environment variables
+#' @param model Model configuration from get_model_config().
+#' @param api_key Optional explicit key.
+#' @return API key string or NULL.
+#' @keywords internal
+resolve_api_key <- function(model, api_key = NULL) {
+  if (!is.null(api_key) && nzchar(api_key)) {
+    return(api_key)
+  }
+
+  env_key <- first_env(model$api_key_env %||% character())
+  if (nzchar(env_key)) {
+    return(env_key)
+  }
+
+  NULL
+}
+
+#' Call LLM API with retry logic
+#' @param prompt User prompt.
+#' @param model Model configuration.
+#' @param api_key API key. Not required for Ollama.
+#' @param max_retries Maximum retry attempts.
+#' @param timeout_sec Request timeout in seconds.
+#' @return Standardized API response list.
+#' @export
+call_llm_api <- function(prompt,
+                         model,
+                         api_key = NULL,
+                         max_retries = 3,
+                         timeout_sec = 60) {
+  stopifnot(is.character(prompt), length(prompt) == 1)
+  
+  if (isTRUE(model$is_ollama)) {
+    return(call_ollama_api(prompt, model, max_retries, timeout_sec))
+  }
+
+  api_key <- resolve_api_key(model, api_key)
+  
+  if (isTRUE(model$requires_api_key) && (is.null(api_key) || identical(api_key, ""))) {
+    env_hint <- paste(model$api_key_env %||% character(), collapse = ", ")
+    stop("API key is required for model: ", model$name,
+         if (nzchar(env_hint)) paste0(". Set one of: ", env_hint) else "",
+         call. = FALSE)
+  }
+  
   start_time <- Sys.time()
+  last_error <- NULL
   
   for (attempt in seq_len(max_retries)) {
-    
-    tryCatch({
-      
+    response <- tryCatch({
       req <- httr2::request(model$api_url) |>
+        httr2::req_timeout(timeout_sec) |>
         httr2::req_headers(
           Authorization = paste("Bearer", api_key),
           "Content-Type" = "application/json"
@@ -66,41 +138,214 @@ call_llm_api <- function(prompt, model, api_key, max_retries = 3) {
         ))
       
       resp <- httr2::req_perform(req)
-      data <- httr2::resp_body_json(resp)
+      data <- httr2::resp_body_json(resp, simplifyVector = FALSE)
       
-      content <- data$choices[[1]]$message$content
-      usage <- data$usage
+      content <- data$choices[[1]]$message$content %||% ""
+      usage <- data$usage %||% list(
+        prompt_tokens = NA_integer_,
+        completion_tokens = NA_integer_,
+        total_tokens = NA_integer_
+      )
       
       elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
       
-      message("API call successful in ", elapsed, " seconds. ",
-              "Tokens used: ", usage$total_tokens)
-      
-      return(list(
+      list(
+        success = TRUE,
         content = content,
         usage = usage,
         model = model$name,
         latency_sec = elapsed,
-        attempt = attempt,
-        success = TRUE
-      ))
-      
+        attempt = attempt
+      )
     }, error = function(e) {
-      warning("API attempt ", attempt, " failed: ", e$message)
-      
-      if (attempt < max_retries) {
-        Sys.sleep(2 * attempt)  # Exponential backoff
-      } else {
-        message("All ", max_retries, " API attempts failed")
-        return(list(
-          content = NULL,
-          error = e$message,
-          success = FALSE,
-          model = model$name
-        ))
-      }
+      last_error <<- conditionMessage(e)
+      NULL
     })
+    
+    if (!is.null(response)) return(response)
+    
+    if (attempt < max_retries) {
+      Sys.sleep(min(2^attempt, 10))
+    }
   }
+  
+  list(
+    success = FALSE,
+    content = NULL,
+    error = last_error %||% "Unknown API error",
+    usage = list(total_tokens = 0),
+    model = model$name,
+    latency_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+    attempt = max_retries
+  )
+}
+
+#' Call local Ollama API
+#' @keywords internal
+call_ollama_api <- function(prompt,
+                            model,
+                            max_retries = 3,
+                            timeout_sec = 120) {
+  start_time <- Sys.time()
+  full_prompt <- paste(create_system_prompt(), prompt, sep = "\n\n")
+  last_error <- NULL
+  
+  for (attempt in seq_len(max_retries)) {
+    response <- tryCatch({
+      req <- httr2::request(model$api_url) |>
+        httr2::req_timeout(timeout_sec) |>
+        httr2::req_body_json(list(
+          model = model$model_id,
+          prompt = full_prompt,
+          stream = FALSE,
+          options = list(
+            temperature = model$temperature,
+            num_predict = model$max_tokens
+          )
+        ))
+      
+      resp <- httr2::req_perform(req)
+      data <- httr2::resp_body_json(resp, simplifyVector = FALSE)
+      
+      content <- data$response %||% ""
+      total_tokens <- ceiling((nchar(full_prompt) + nchar(content)) / 4)
+      
+      list(
+        success = TRUE,
+        content = content,
+        usage = list(
+          prompt_tokens = ceiling(nchar(full_prompt) / 4),
+          completion_tokens = ceiling(nchar(content) / 4),
+          total_tokens = total_tokens
+        ),
+        model = model$name,
+        latency_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+        attempt = attempt
+      )
+    }, error = function(e) {
+      last_error <<- conditionMessage(e)
+      NULL
+    })
+    
+    if (!is.null(response)) return(response)
+    if (attempt < max_retries) Sys.sleep(min(2^attempt, 10))
+  }
+  
+  list(
+    success = FALSE,
+    content = NULL,
+    error = last_error %||% "Unknown Ollama error",
+    usage = list(total_tokens = 0),
+    model = model$name,
+    latency_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+    attempt = max_retries
+  )
+}
+
+#' Parse an LLM annotation response
+#'
+#' Extracts a JSON payload from a model response and normalizes it to the
+#' annotation schema used by DeepSeekCell. A simple line-by-line fallback is
+#' used for legacy responses.
+#'
+#' @param response_text Raw response text from an LLM endpoint.
+#' @return Data frame with annotation columns.
+#' @export
+parse_annotation_response <- function(response_text) {
+  
+  if (is.null(response_text) || !nzchar(trimws(response_text))) {
+    return(.empty_annotation_result())
+  }
+  
+  json_str <- extract_json_payload(response_text)
+
+  if (is.null(json_str)) {
+    warning("No JSON object found in response.")
+    return(.parse_line_by_line(response_text))
+  }
+  
+  parsed <- tryCatch(
+    jsonlite::fromJSON(json_str, simplifyDataFrame = TRUE),
+    error = function(e) {
+      warning("JSON parsing failed: ", conditionMessage(e))
+      NULL
+    }
+  )
+  
+  if (is.null(parsed)) {
+    return(.parse_line_by_line(response_text))
+  }
+  
+  ann <- parsed$annotations %||% parsed
+
+  if (is.list(ann) && !is.data.frame(ann)) {
+    ann <- tryCatch(
+      as.data.frame(ann, stringsAsFactors = FALSE),
+      error = function(e) NULL
+    )
+  }
+
+  if (!is.data.frame(ann) || nrow(ann) == 0) {
+    return(.empty_annotation_result())
+  }
+
+  .normalise_annotation_dataframe(ann)
+}
+
+.empty_annotation_result <- function() {
+  data.frame(
+    Cluster = character(),
+    CellType = character(),
+    Confidence = numeric(),
+    IsMixed = logical(),
+    PrimaryCellType = character(),
+    SecondaryCellType = character(),
+    TissueConsistency = character(),
+    Reasoning = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+.normalise_annotation_dataframe <- function(ann) {
+  names(ann) <- tolower(names(ann))
+  
+  get_col <- function(df, candidates, default) {
+    hit <- candidates[candidates %in% names(df)]
+    if (length(hit) == 0) {
+      if (length(default) == nrow(df)) {
+        return(default)
+      }
+      return(rep(default, nrow(df)))
+    }
+    df[[hit[1]]]
+  }
+  
+  confidence <- as_confidence(get_col(ann, "confidence", 0.5))
+  is_mixed <- as_flag(get_col(ann, c("is_mixed", "ismixed", "mixed"), FALSE))
+  
+  result <- data.frame(
+    Cluster = as.character(get_col(ann, "cluster", paste0("Cluster", seq_len(nrow(ann))))),
+    CellType = as.character(get_col(ann, c("cell_type", "celltype"), "Unknown")),
+    Confidence = confidence,
+    IsMixed = is_mixed,
+    PrimaryCellType = as.character(get_col(ann, c("primary_cell_type", "primarycelltype"), "")),
+    SecondaryCellType = as.character(get_col(ann, c("secondary_cell_type", "secondarycelltype"), "")),
+    TissueConsistency = as.character(get_col(ann, c("tissue_consistency", "tissueconsistency"), "unknown")),
+    Reasoning = as.character(get_col(ann, "reasoning", NA_character_)),
+    stringsAsFactors = FALSE
+  )
+  
+  result$Cluster <- trimws(result$Cluster)
+  result$CellType <- trimws(result$CellType)
+  result$PrimaryCellType <- trimws(result$PrimaryCellType)
+  result$SecondaryCellType <- trimws(result$SecondaryCellType)
+  result$TissueConsistency <- trimws(tolower(result$TissueConsistency))
+  result$TissueConsistency[!result$TissueConsistency %in% c(
+    "expected", "unexpected", "possible_contamination", "possible_doublet", "unknown"
+  )] <- "unknown"
+  result$CellType[!nzchar(result$CellType) | is.na(result$CellType)] <- "Unknown"
+  
+  result
 }
 
 #' Create system prompt for annotation task
@@ -109,96 +354,29 @@ call_llm_api <- function(prompt, model, api_key, max_retries = 3) {
 #' @export
 create_system_prompt <- function() {
   paste(
-    "You are a Senior Bioinformatics Scientist specializing in single-cell RNA-seq analysis.",
-    "Your task is to annotate cell clusters based on their marker genes.",
+    "You are a senior bioinformatics scientist specializing in single-cell RNA-seq analysis.",
+    "Annotate cell clusters from marker genes using rigorous marker-gene reasoning.",
     "",
-    "Rules:",
-    "1. Provide reasoning for each annotation",
-    "2. Output confidence scores between 0 and 1",
-    "3. Use standardized cell type names",
-    "4. If uncertain, suggest 'Unknown' with low confidence",
+    "Core principles:",
+    "1. Identify the most likely biological cell type from the markers.",
+    "2. Do not return Unknown only because the cell type is unexpected in the stated tissue.",
+    "3. If markers indicate contamination, ambient RNA, or doublets, report the likely biological identity and flag it.",
+    "4. Use Unknown only when marker evidence is biologically incoherent or insufficient.",
+    "5. Use Cell Ontology-compatible names when possible, but do not invent ontology IDs.",
+    "6. Use standardized cell type names suitable for publication.",
+    "7. Return confidence scores between 0 and 1.",
+    "8. Return only valid JSON.",
     "",
-    "Output format (JSON):",
-    '{"annotations": [',
-    '  {"cluster": "Cluster1", "cell_type": "T cell", "confidence": 0.95, "reasoning": "CD3D and CD3E are T cell markers"},',
-    '  ...',
-    ']}',
+    "Required JSON fields:",
+    "cluster, cell_type, confidence, is_mixed, primary_cell_type, secondary_cell_type, tissue_consistency, reasoning.",
     sep = "\n"
   )
 }
 
-#' Parse LLM response to extract annotations
-#' 
-#' @param response_text Raw response from API
-#' @return Data frame with cluster, cell_type, confidence, reasoning
-#' @export
-parse_annotation_response <- function(response_text) {
-  
-  if (is.null(response_text) || response_text == "") {
-    return(data.frame())
-  }
-  
-  # Step 1: Remove markdown code fences (```json ... ```)
-  # Remove opening ```json or ``` (with optional newline)
-  cleaned <- gsub("^```(?:json)?\\s*\n?", "", response_text, perl = TRUE)
-  # Remove closing ``` at the end (with optional whitespace before)
-  cleaned <- gsub("\n?\\s*```$", "", cleaned, perl = TRUE)
-  
-  # Step 2: Find the first '{' and the last '}' in the cleaned string
-  first_brace <- regexpr("\\{", cleaned, perl = TRUE)
-  last_brace <- regexpr("\\}[^}]*$", cleaned, perl = TRUE)  # position of last '}'
-  
-  if (first_brace == -1 || last_brace == -1) {
-    warning("No JSON object found in response")
-    return(.parse_line_by_line(response_text))
-  }
-  
-  # Extract JSON substring
-  json_str <- substr(cleaned, first_brace, last_brace + attr(last_brace, "match.length") - 1)
-  
-  # Step 3: Parse JSON
-  tryCatch({
-    parsed <- jsonlite::fromJSON(json_str, simplifyVector = TRUE)
-    
-    # Extract annotations array
-    annotations_list <- if (!is.null(parsed$annotations)) parsed$annotations else parsed
-    
-    # Convert to data frame
-    if (is.data.frame(annotations_list)) {
-      df <- annotations_list
-    } else if (is.list(annotations_list) && length(annotations_list) > 0) {
-      # Flatten list of lists into data frame
-      df <- do.call(rbind, lapply(annotations_list, function(x) {
-        as.data.frame(t(unlist(x)), stringsAsFactors = FALSE)
-      }))
-    } else {
-      df <- NULL
-    }
-    
-    if (!is.null(df) && nrow(df) > 0) {
-      # Standardize column names
-      names(df) <- tolower(names(df))
-      
-      # Map expected columns
-      result <- data.frame(
-        Cluster = if ("cluster" %in% names(df)) df$cluster else paste0("Cluster", 1:nrow(df)),
-        CellType = if ("cell_type" %in% names(df)) df$cell_type else 
-          if ("celltype" %in% names(df)) df$celltype else "Unknown",
-        Confidence = if ("confidence" %in% names(df)) as.numeric(df$confidence) else 0.5,
-        Reasoning = if ("reasoning" %in% names(df)) df$reasoning else NA,
-        stringsAsFactors = FALSE
-      )
-      return(result)
-    }
-  }, error = function(e) {
-    warning("JSON parsing failed: ", e$message)
-  })
-  
-  # Fallback: line-by-line parsing
-  .parse_line_by_line(response_text)
-}
 
 #' Internal: parse line-by-line format (fallback)
+#' @param response_text Raw response text.
+#' @keywords internal
 .parse_line_by_line <- function(response_text) {
   lines <- strsplit(response_text, "\n")[[1]]
   results <- list()
@@ -212,17 +390,21 @@ parse_annotation_response <- function(response_text) {
       results[[length(results) + 1]] <- data.frame(
         Cluster = trimws(matches[[1]][2]),
         CellType = trimws(matches[[1]][3]),
-        Confidence = as.numeric(matches[[1]][4]),
-        Reasoning = NA,
+        Confidence = as_confidence(matches[[1]][4]),
+        IsMixed = FALSE,
+        PrimaryCellType = trimws(matches[[1]][3]),
+        SecondaryCellType = "",
+        TissueConsistency = "unknown",
+        Reasoning = NA_character_,
         stringsAsFactors = FALSE
       )
     }
   }
   
   if (length(results) > 0) {
-    return(do.call(rbind, results))
+    return(.normalise_annotation_dataframe(do.call(rbind, results)))
   }
   
   warning("Could not parse response: ", substr(response_text, 1, 200))
-  return(data.frame())
+  .empty_annotation_result()
 }

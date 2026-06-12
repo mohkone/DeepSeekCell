@@ -2,6 +2,7 @@
 .Rproj.user
 .Rhistory
 .RData
+.RDataTmp*
 .Ruserdata
 *.Rproj
 
@@ -15,6 +16,7 @@ scType/ScTypeDB_full.xlsx
 # R package artifacts
 *.tar.gz
 *.Rcheck/
+..Rcheck/
 
 # macOS
 .DS_Store
@@ -22,12 +24,20 @@ scType/ScTypeDB_full.xlsx
 # Output files
 benchmark_results.csv
 benchmark_plot.pdf
+benchmark_*.pdf
+benchmark_*.csv
+Figure*_*.tiff
+global_benchmark_comparison.*
 unmatched_celltypes.log
 annotation_*.csv
 annotation_*.xlsx
 annotation_*.html
 confidence_plot.png
+benchmark_cache/
+benchmark_debug/
+results/
 
 # Temporary files
 *.tmp
 *.log
+.positai
