@@ -12,7 +12,7 @@ suppressPackageStartupMessages({
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x
 
 .standardize_markers <- function(markers, top_n = TOP_MARKERS) {
-  
+
   markers <- markers[
     !grepl(
       "^MT-|^MTRNR|^RP[SL]|^MALAT|^XIST|^HB[AB]|^RP11-|^CTD-|^AC[0-9]|^AL[0-9]|^LINC",
@@ -20,23 +20,23 @@ suppressPackageStartupMessages({
       ignore.case = TRUE
     ),
   ]
-  
+
   if ("p_val_adj" %in% colnames(markers)) {
     markers <- markers[markers$p_val_adj < 0.05, ]
   }
-  
+
   markers <- markers[order(
     markers$cluster,
     -markers$pct.1,
     -markers$avg_log2FC
   ), ]
-  
+
   markers_list <- split(markers$gene, markers$cluster)
-  
+
   markers_list <- lapply(markers_list, function(x) {
     head(unique(x), top_n)
   })
-  
+
   markers_list[lengths(markers_list) > 0]
 }
 
@@ -48,14 +48,14 @@ suppressPackageStartupMessages({
                             resolution = SEURAT_RESOLUTION,
                             npcs = N_PCS,
                             top_n = TOP_MARKERS) {
-  
+
   seu <- NormalizeData(seu, verbose = FALSE)
   seu <- FindVariableFeatures(seu, verbose = FALSE)
   seu <- ScaleData(seu, verbose = FALSE)
   seu <- RunPCA(seu, npcs = npcs, verbose = FALSE)
   seu <- FindNeighbors(seu, dims = seq_len(min(npcs, 30)), verbose = FALSE)
   seu <- FindClusters(seu, resolution = resolution, verbose = FALSE)
-  
+
   markers <- FindAllMarkers(
     seu,
     only.pos = TRUE,
@@ -64,12 +64,12 @@ suppressPackageStartupMessages({
     test.use = "wilcox",
     verbose = FALSE
   )
-  
+
   markers_list <- .standardize_markers(markers, top_n = top_n)
-  
+
   names(truth_vector) <- colnames(seu)
   seu$true_label <- truth_vector[colnames(seu)]
-  
+
   cluster_truth <- sapply(names(markers_list), function(cl) {
     cells <- WhichCells(seu, idents = cl)
     labs <- truth_vector[cells]
@@ -77,7 +77,7 @@ suppressPackageStartupMessages({
     if (length(labs) == 0) return("Unknown")
     names(sort(table(labs), decreasing = TRUE))[1]
   })
-  
+
   purities <- sapply(names(markers_list), function(cl) {
     cells <- WhichCells(seu, idents = cl)
     labs <- truth_vector[cells]
@@ -85,7 +85,7 @@ suppressPackageStartupMessages({
     if (length(labs) == 0) return(NA_real_)
     max(table(labs)) / length(labs)
   })
-  
+
   list(
     markers = markers_list,
     truth = cluster_truth[names(markers_list)],
@@ -150,12 +150,12 @@ suppressPackageStartupMessages({
 # -----------------------------------------------------------------------------
 get_pbmc_data <- function(seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   pbmc <- SeuratData::LoadData("pbmc3k")
-  
+
   raw <- pbmc$seurat_annotations
   raw <- .clean_label(raw)
-  
+
   truth <- sapply(raw, function(x) {
     x_low <- tolower(x)
     if (grepl("cd4", x_low)) return("Naive T cell")
@@ -168,7 +168,7 @@ get_pbmc_data <- function(seed = NULL) {
     if (grepl("platelet", x_low)) return("Platelet")
     "Unknown"
   })
-  
+
   .process_seurat(pbmc, truth, "PBMC", "Human", "PBMC")
 }
 
@@ -177,12 +177,12 @@ get_pbmc_data <- function(seed = NULL) {
 # -----------------------------------------------------------------------------
 get_baron_pancreas_data <- function(seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   sce <- scRNAseq::BaronPancreasData()
   seu <- CreateSeuratObject(counts = assay(sce), meta.data = as.data.frame(colData(sce)))
-  
+
   raw <- .clean_label(seu$label)
-  
+
   truth <- dplyr::recode(
     raw,
     "beta" = "Beta cell",
@@ -201,7 +201,7 @@ get_baron_pancreas_data <- function(seed = NULL) {
     "pericyte" = "Pericyte",
     .default = "Unknown"
   )
-  
+
   .process_seurat(seu, truth, "Pancreas", "Human", "BaronPancreas")
 }
 
@@ -210,39 +210,39 @@ get_baron_pancreas_data <- function(seed = NULL) {
 # -----------------------------------------------------------------------------
 get_muraro_pancreas_data <- function(seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   sce <- scRNAseq::MuraroPancreasData()
   sce <- sce[, !is.na(sce$label) & sce$label != "unclear"]
-  
+
   counts_mat <- counts(sce)
-  
+
   gene_names <- rownames(counts_mat)
-  
+
   gene_names <- gsub("__.*$", "", gene_names)
   gene_names <- gsub("--.*$", "", gene_names)
-  
+
   gene_names <- make.unique(gene_names)
-  
+
   rownames(counts_mat) <- gene_names
-  
+
   colnames(counts_mat) <- make.unique(as.character(colnames(counts_mat)))
-  
+
   message("Muraro cleaned genes: ", paste(head(rownames(counts_mat)), collapse = ", "))
   message("Muraro marker overlap test: ",
           sum(c("INS", "GCG", "SST", "KRT19", "PRSS1", "CPA1") %in% rownames(counts_mat)))
-  
+
   md <- as.data.frame(colData(sce))
   rownames(md) <- colnames(counts_mat)
-  
+
   seu <- CreateSeuratObject(
     counts = counts_mat,
     meta.data = md
   )
-  
+
   DefaultAssay(seu) <- "RNA"
-  
+
   raw <- .clean_label(md$label)
-  
+
   truth <- sapply(raw, function(x) {
     x_low <- tolower(x)
     if (grepl("alpha", x_low)) return("Alpha cell")
@@ -255,7 +255,7 @@ get_muraro_pancreas_data <- function(seed = NULL) {
     if (grepl("mesenchymal|stellate", x_low)) return("Stellate cell")
     "Unknown"
   })
-  
+
   .process_seurat(seu, truth, "Pancreas", "Human", "MuraroPancreas")
 }
 
@@ -264,23 +264,23 @@ get_muraro_pancreas_data <- function(seed = NULL) {
 # -----------------------------------------------------------------------------
 get_lawlor_pancreas_data <- function(seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   sce <- scRNAseq::LawlorPancreasData()
   sce <- sce[, !is.na(sce$celltype) & sce$celltype != ""]
-  
+
   counts_mat <- counts(sce)
   metadata <- as.data.frame(colData(sce))
-  
+
   if (is.null(colnames(counts_mat))) {
     colnames(counts_mat) <- paste0("cell_", seq_len(ncol(counts_mat)))
   }
-  
+
   rownames(metadata) <- colnames(counts_mat)
-  
+
   seu <- CreateSeuratObject(counts = counts_mat, meta.data = metadata)
-  
+
   raw <- .clean_label(seu$celltype)
-  
+
   truth <- sapply(raw, function(x) {
     x_low <- tolower(x)
     if (grepl("alpha", x_low)) return("Alpha cell")
@@ -293,7 +293,7 @@ get_lawlor_pancreas_data <- function(seed = NULL) {
     if (grepl("macrophage|immune", x_low)) return("Immune cell")
     "Unknown"
   })
-  
+
   .process_seurat(seu, truth, "Pancreas", "Human", "LawlorPancreas")
 }
 
@@ -302,12 +302,12 @@ get_lawlor_pancreas_data <- function(seed = NULL) {
 # -----------------------------------------------------------------------------
 get_tasic_brain_data <- function(seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   sce <- scRNAseq::TasicBrainData()
   seu <- CreateSeuratObject(counts = counts(sce), meta.data = as.data.frame(colData(sce)))
-  
+
   raw <- .clean_label(seu$broad_type)
-  
+
   truth <- sapply(raw, function(x) {
     x_low <- tolower(x)
     if (grepl("opc|precursor", x_low)) return("Oligodendrocyte precursor cell")
@@ -320,7 +320,7 @@ get_tasic_brain_data <- function(seed = NULL) {
     if (grepl("peri", x_low)) return("Pericyte")
     "Unknown"
   })
-  
+
   .process_seurat(seu, truth, "Brain", "Mouse", "TasicBrain")
 }
 
@@ -329,14 +329,14 @@ get_tasic_brain_data <- function(seed = NULL) {
 # -----------------------------------------------------------------------------
 get_zeisel_brain_data <- function(seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   sce <- scRNAseq::ZeiselBrainData()
   rownames(sce) <- make.names(rownames(sce))
-  
+
   seu <- CreateSeuratObject(counts = assay(sce), meta.data = as.data.frame(colData(sce)))
-  
+
   raw <- .clean_label(seu$level2class)
-  
+
   truth <- sapply(raw, function(x) {
     x_low <- tolower(x)
     if (grepl("pyr|excit", x_low)) return("Excitatory neuron")
@@ -352,7 +352,7 @@ get_zeisel_brain_data <- function(seed = NULL) {
     if (grepl("epend", x_low)) return("Ependymal cell")
     "Unknown"
   })
-  
+
   .process_seurat(seu, truth, "Brain", "Mouse", "ZeiselBrain")
 }
 
@@ -361,10 +361,10 @@ get_zeisel_brain_data <- function(seed = NULL) {
 # -----------------------------------------------------------------------------
 get_zilionis_lung_data <- function(seed = NULL, n_cells = 5000) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   sce <- scRNAseq::ZilionisLungData()
   md_all <- as.data.frame(colData(sce))
-  
+
   label_candidates <- c(
     "Major cell type",
     "Major.cell.type",
@@ -377,15 +377,15 @@ get_zilionis_lung_data <- function(seed = NULL, n_cells = 5000) {
     "Most likely LM22 cell type",
     "cluster"
   )
-  
+
   label_col <- intersect(label_candidates, colnames(md_all))[1]
-  
+
   if (is.na(label_col)) {
     message("Available Zilionis metadata columns:")
     print(colnames(md_all))
     stop("No usable label column found for ZilionisLung.", call. = FALSE)
   }
-  
+
   message("Zilionis label column used: ", label_col)
   annotated <- !is.na(md_all[[label_col]]) &
     nzchar(trimws(as.character(md_all[[label_col]])))
@@ -428,12 +428,12 @@ get_zilionis_lung_data <- function(seed = NULL, n_cells = 5000) {
     counts = counts_mat,
     meta.data = md
   )
-  
+
   raw <- .clean_label(md[[label_col]])
-  
+
   truth <- sapply(raw, function(x) {
     x_low <- tolower(x)
-    
+
     if (.is_unknown_label(x_low)) return("Unknown")
     if (grepl("patient[0-9]+.*specific|epithelial|alveolar|club|ciliated|tumor|malignant|cancer|type i cells|type ii cells", x_low)) return("Epithelial cell")
     if (grepl("t cell|cd4|cd8", x_low)) return("T cell")
@@ -450,13 +450,13 @@ get_zilionis_lung_data <- function(seed = NULL, n_cells = 5000) {
     if (grepl("endothelial", x_low)) return("Endothelial cell")
     if (grepl("smooth muscle|pericyte", x_low)) return("Smooth muscle cell")
     if (grepl("^[bt]?rbc$|erythro|red blood", x_low)) return("Erythrocyte")
-    
+
     "Unknown"
   })
-  
+
   message("Zilionis truth labels:")
   print(table(truth))
-  
+
   .process_seurat(
     seu,
     truth,
@@ -470,30 +470,30 @@ get_zilionis_lung_data <- function(seed = NULL, n_cells = 5000) {
 # 8. Segerstolpe Pancreas
 # -----------------------------------------------------------------------------
 get_segerstolpe_pancreas_data <- function(seed = NULL) {
-  
+
   if (!is.null(seed))
     set.seed(seed)
-  
+
   sce <- scRNAseq::SegerstolpePancreasData()
-  
+
   md <- as.data.frame(colData(sce))
-  
+
   label_col <- intersect(
     c("cell type", "celltype", "label"),
     colnames(md)
   )[1]
-  
+
   if (is.na(label_col))
     stop("Could not find cell type column")
-  
+
   sce <- sce[, !is.na(md[[label_col]]) &
                md[[label_col]] != ""]
-  
+
   seu <- CreateSeuratObject(
     counts = counts(sce),
     meta.data = as.data.frame(colData(sce))
   )
-  
+
   raw <- .clean_label(
     seu@meta.data[[label_col]]
   )
@@ -503,13 +503,13 @@ get_segerstolpe_pancreas_data <- function(seed = NULL) {
 # -----------------------------------------------------------------------------
 get_romanov_brain_data <- function(seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   sce <- scRNAseq::RomanovBrainData()
   seu <- CreateSeuratObject(counts = counts(sce), meta.data = as.data.frame(colData(sce)))
-  
+
   label_col <- if ("cell.type1" %in% colnames(seu@meta.data)) "cell.type1" else colnames(seu@meta.data)[1]
   raw <- .clean_label(seu@meta.data[[label_col]])
-  
+
   truth <- sapply(raw, function(x) {
     x_low <- tolower(x)
     if (grepl("excit|glut|pyr", x_low)) return("Excitatory neuron")
@@ -522,7 +522,7 @@ get_romanov_brain_data <- function(seed = NULL) {
     if (grepl("epend", x_low)) return("Ependymal cell")
     "Unknown"
   })
-  
+
   .process_seurat(seu, truth, "Brain", "Mouse", "RomanovBrain")
 }
 
@@ -531,27 +531,27 @@ get_romanov_brain_data <- function(seed = NULL) {
 # -----------------------------------------------------------------------------
 get_tabula_muris_droplet_data <- function(seed = NULL, tissue_filter = "Lung", n_cells = 5000) {
   if (!is.null(seed)) set.seed(seed)
-  
+
   sce <- scRNAseq::TabulaMurisDropletData()
   cd <- as.data.frame(colData(sce))
-  
+
   tissue_col <- intersect(c("tissue", "tissue_type", "organ"), colnames(cd))[1]
   label_col <- intersect(c("cell_ontology_class", "cell.type", "cell_type", "label"), colnames(cd))[1]
-  
+
   if (is.na(tissue_col) || is.na(label_col)) {
     stop("Could not find tissue or label columns in TabulaMurisDropletData.", call. = FALSE)
   }
-  
+
   keep <- cd[[tissue_col]] == tissue_filter & !is.na(cd[[label_col]])
   sce <- sce[, keep]
-  
+
   if (!is.null(n_cells) && n_cells < ncol(sce)) {
     sce <- sce[, sample(colnames(sce), n_cells)]
   }
-  
+
   seu <- CreateSeuratObject(counts = counts(sce), meta.data = as.data.frame(colData(sce)))
   raw <- .clean_label(seu@meta.data[[label_col]])
-  
+
   truth <- sapply(raw, function(x) {
     x_low <- tolower(x)
     if (grepl("t cell", x_low)) return("T cell")
@@ -566,7 +566,7 @@ get_tabula_muris_droplet_data <- function(seed = NULL, tissue_filter = "Lung", n
     if (grepl("smooth muscle", x_low)) return("Smooth muscle cell")
     "Unknown"
   })
-  
+
   .process_seurat(seu, truth, tissue_filter, "Mouse", paste0("TabulaMuris", tissue_filter))
 }
 
@@ -587,20 +587,48 @@ cache_dataset <- function(name, seed, loader) {
     sep = "_"
   )
   cache_key <- gsub("[^A-Za-z0-9_.-]", "_", cache_key)
-  
+
   cache_file <- file.path(
     "benchmark_cache",
     paste0(cache_key, ".rds")
   )
-  
+
   if (file.exists(cache_file)) {
     message("Loading cached dataset: ", cache_file)
-    return(readRDS(cache_file))
+    cached_obj <- tryCatch(
+      readRDS(cache_file),
+      error = function(e) {
+        warning(
+          "Cached dataset could not be read and will be rebuilt: ",
+          cache_file,
+          "\nReason: ",
+          e$message,
+          call. = FALSE
+        )
+        NULL
+      }
+    )
+
+    if (!is.null(cached_obj)) {
+      return(cached_obj)
+    }
+
+    corrupt_file <- paste0(
+      cache_file,
+      ".corrupt-",
+      format(Sys.time(), "%Y%m%d%H%M%S")
+    )
+    file.rename(cache_file, corrupt_file)
   }
-  
+
   message("Processing dataset: ", name)
   obj <- loader()
-  saveRDS(obj, cache_file)
+  tmp_file <- tempfile(pattern = paste0(cache_key, "_"), tmpdir = "benchmark_cache", fileext = ".tmp")
+  saveRDS(obj, tmp_file)
+  if (!file.rename(tmp_file, cache_file)) {
+    file.copy(tmp_file, cache_file, overwrite = TRUE)
+    unlink(tmp_file)
+  }
   obj
 }
 
@@ -608,15 +636,15 @@ cache_dataset <- function(name, seed, loader) {
 load_benchmark_datasets <- function(seed = 100) {
   list(
     PBMC = cache_dataset("PBMC", seed, function() get_pbmc_data(seed)),
-    
+
     BaronPancreas = cache_dataset("BaronPancreas", seed, function() get_baron_pancreas_data(seed)),
-    
+
     MuraroPancreas = cache_dataset("MuraroPancreas", seed, function() get_muraro_pancreas_data(seed)),
-    
+
     TasicBrain = cache_dataset("TasicBrain", seed, function() get_tasic_brain_data(seed)),
-    
+
     ZeiselBrain = cache_dataset("ZeiselBrain", seed, function() get_zeisel_brain_data(seed)),
-    
+
     ZilionisLung = cache_dataset("ZilionisLung", seed, function() get_zilionis_lung_data(seed))
   )
 }

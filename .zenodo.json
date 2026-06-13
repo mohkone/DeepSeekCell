@@ -1,0 +1,32 @@
+{
+  "title": "DeepSeekCell: an ontology-guided large language model framework and interactive Shiny platform for explainable cell type annotation in single-cell RNA sequencing",
+  "upload_type": "software",
+  "description": "DeepSeekCell is an R package and Shiny application for marker-driven, ontology-guided, explainable cell type annotation in single-cell RNA sequencing. It supports DeepSeek API and local Ollama backends, maps predictions to Cell Ontology identifiers, exports reports, and includes reproducible benchmarking scripts.",
+  "creators": [
+    {
+      "name": "Kone, Mohamed",
+      "affiliation": "Hunan University"
+    },
+    {
+      "name": "Wang, Shulin",
+      "affiliation": "Hunan University"
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "single-cell RNA sequencing",
+    "cell type annotation",
+    "large language models",
+    "Cell Ontology",
+    "Shiny",
+    "bioinformatics",
+    "explainable AI"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/mohkone/DeepSeekCell",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

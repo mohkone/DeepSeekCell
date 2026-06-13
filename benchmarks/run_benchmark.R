@@ -11,6 +11,7 @@ source("benchmarks/config.R")
 source("benchmarks/datasets.R")
 source("benchmarks/methods.R")
 source("benchmarks/metrics.R")
+source("benchmarks/statistics.R")
 
 custom_mapping <- list(
   immune = c(
@@ -21,18 +22,18 @@ custom_mapping <- list(
     "cd8 positive nkt like cells" = "Cytotoxic T cell",
     "cd8 nkt like cells" = "Cytotoxic T cell",
     "nkt like cells" = "Cytotoxic T cell",
-    
+
     "naive b cells" = "B cell",
     "memory b cells" = "B cell",
     "plasma b cells" = "B cell",
-    
+
     "classical monocytes" = "Classical monocyte",
     "non classical monocytes" = "Non-classical monocyte",
     "non classical monocyte" = "Non-classical monocyte",
-    
+
     "natural killer cells" = "Natural killer cell",
     "natural killer  cells" = "Natural killer cell",
-    
+
     "activated cd4 t cell" = "Naive T cell",
     "cd4 t cell" = "Naive T cell",
     "cd8 t cell" = "Cytotoxic T cell",
@@ -192,9 +193,9 @@ get_domain <- function(tissue) {
 harmonise_labels <- function(labels, tissue, ont_data = NULL) {
   labs <- normalize_label(labels)
   out <- rep("Unknown", length(labs))
-  
+
   domain <- get_domain(tissue)
-  
+
   maps <- c(
     custom_mapping[[domain]] %||% character(),
     custom_mapping$immune,
@@ -202,20 +203,20 @@ harmonise_labels <- function(labels, tissue, ont_data = NULL) {
     custom_mapping$brain,
     custom_mapping$lung
   )
-  
+
   for (i in seq_along(labs)) {
     lab <- labs[i]
-    
+
     if (.is_unknown_label(lab)) {
       out[i] <- "Unknown"
       next
     }
-    
+
     if (lab %in% names(maps)) {
       out[i] <- maps[[lab]]
       next
     }
-    
+
     if (domain == "immune") {
       if (grepl("non classical|nonclassical|fcgr3a", lab)) {
         out[i] <- "Non-classical monocyte"
@@ -262,59 +263,60 @@ harmonise_labels <- function(labels, tissue, ont_data = NULL) {
       if (grepl("patient[0-9]+.*specific|epithelial|alveolar|club|ciliated|basal|goblet|ionocyte|secretory|tumor|malignant|cancer|type i|type ii", lab)) out[i] <- "Epithelial cell"
       else if (grepl("t cell", lab)) out[i] <- "T cell"
       else if (grepl("b cell", lab)) out[i] <- "B cell"
+      else if (grepl("plasmacytoid|(^| )pdc|dendritic|(^| )dc|dcs", lab)) out[i] <- "Dendritic cell"
       else if (grepl("plasma", lab)) out[i] <- "Plasma cell"
       else if (.is_nk_label(lab)) out[i] <- "Natural killer cell"
       else if (grepl("platelet", lab)) out[i] <- "Platelet"
-      else if (grepl("macrophage", lab)) out[i] <- "Macrophage"
+      else if (grepl("macrophage|(^| )mph($| )", lab)) out[i] <- "Macrophage"
       else if (grepl("monocyte", lab)) out[i] <- "Monocyte"
       else if (grepl("neutrophil", lab)) out[i] <- "Neutrophil"
-      else if (grepl("dendritic", lab)) out[i] <- "Dendritic cell"
       else if (grepl("mast", lab)) out[i] <- "Mast cell"
       else if (grepl("fibroblast", lab)) out[i] <- "Fibroblast"
-      else if (grepl("endothelial", lab)) out[i] <- "Endothelial cell"
+      else if (grepl("endothelial|(^| )ec($| )|capillary|venous|arterial|lymphatic", lab)) out[i] <- "Endothelial cell"
       else if (grepl("smooth muscle", lab)) out[i] <- "Smooth muscle cell"
-      else if (grepl("^[bt]?rbc$|erythrocyte|red blood cell", lab)) out[i] <- "Erythrocyte"
+      else if (grepl("^[bt]?rbc$|erythrocyte|erythroid|red blood cell", lab)) out[i] <- "Erythrocyte"
+      else if (grepl("neuroendocrine", lab)) out[i] <- "Epithelial cell"
     }
-    
+
     if (out[i] == "Unknown") {
       out[i] <- labels[i]
     }
   }
-  
+
   names(out) <- names(labels)
   trimws(out)
 }
 
 cell_to_cluster_prediction <- function(cell_pred, seu, cluster_names) {
-  
+
   cluster_ids <- as.character(seu$seurat_clusters)
-  
+
   if (is.null(names(cluster_ids))) {
     names(cluster_ids) <- colnames(seu)
   }
-  
+
   if (is.null(names(cell_pred))) {
     names(cell_pred) <- colnames(seu)
   }
-  
+
   cluster_pred <- sapply(cluster_names, function(cl) {
-    
+
     cell_names <- names(cluster_ids)[cluster_ids == cl]
-    
+
     if (length(cell_names) == 0) {
       return("Unknown")
     }
-    
+
     pred_cl <- cell_pred[cell_names]
     pred_cl <- pred_cl[!is.na(pred_cl) & pred_cl != ""]
-    
+
     if (length(pred_cl) == 0) {
       return("Unknown")
     }
-    
+
     names(sort(table(pred_cl), decreasing = TRUE))[1]
   })
-  
+
   names(cluster_pred) <- cluster_names
   cluster_pred
 }
@@ -326,31 +328,33 @@ run_benchmark_wrapper <- function(dataset_name,
                                   db_file,
                                   replicate = NA_integer_,
                                   api_key = NULL) {
-  
+
   markers <- data$markers
   truth <- data$truth
   tissue <- data$tissue
   species <- data$species
   seu <- data$seurat_obj
-  
+
   method_res <- switch(
     method,
     DeepSeek = run_llm_annotation(markers, tissue, species, dataset_name, "deepseek", api_key),
     SingleR = run_singler(seu, dataset_name),
     scType = run_sctype_custom(seu, tissue, db_file, species = species, verbose = TRUE),
+    scmap = run_scmap(seu, dataset_name),
+    CellTypist = run_celltypist(seu, tissue, species = species, dataset_name = dataset_name),
     stop("Unknown method: ", method, call. = FALSE)
   )
-  
+
   pred <- method_res$predictions
-  
-  if (method %in% c("SingleR", "scType")) {
+
+  if (method %in% c("SingleR", "scType", "scmap")) {
     pred <- cell_to_cluster_prediction(pred, seu, names(markers))
   } else {
     pred <- setNames(pred, names(markers))
   }
-  
+
   truth_aligned <- truth[names(pred)]
-  
+
   pred_h <- harmonise_labels(pred, tissue, ont_data)
   truth_h <- harmonise_labels(truth_aligned, tissue, ont_data)
 
@@ -359,7 +363,7 @@ run_benchmark_wrapper <- function(dataset_name,
   } else {
     rep(NA_real_, length(pred))
   }
-  
+
   debug_df <- data.frame(
     Replicate = replicate,
     Dataset = dataset_name,
@@ -372,10 +376,10 @@ run_benchmark_wrapper <- function(dataset_name,
     HarmonisedTruth = as.character(truth_h),
     stringsAsFactors = FALSE
   )
-  
+
   debug_dir <- file.path("results", "benchmark_debug")
   dir.create(debug_dir, recursive = TRUE, showWarnings = FALSE)
-  
+
   write.csv(
     debug_df,
     file = file.path(
@@ -384,9 +388,9 @@ run_benchmark_wrapper <- function(dataset_name,
     ),
     row.names = FALSE
   )
-  
+
   metrics <- evaluate_metrics(pred_h, truth_h, ont_data, tissue = tissue)
-  
+
   data.frame(
     Dataset = dataset_name,
     Tissue = tissue,
@@ -408,17 +412,17 @@ run_replicated_benchmark <- function(n_replicates = 1,
                                      ont_data,
                                      sctype_db_path,
                                      deepseek_key) {
-  
+
   all_results <- list()
   dataset_summaries <- list()
   cluster_summaries <- list()
-  
+
   for (rep in seq_len(n_replicates)) {
     cat("\n========== REPLICATE", rep, "of", n_replicates, "==========\n")
-    
+
     seed_val <- rep * 100
     set.seed(seed_val)
-    
+
     datasets <- load_benchmark_datasets(seed = seed_val)
 
     dataset_summaries[[length(dataset_summaries) + 1]] <- bind_rows(
@@ -430,22 +434,27 @@ run_replicated_benchmark <- function(n_replicates = 1,
       lapply(datasets, function(x) x$cluster_summary)
     ) %>%
       mutate(Replicate = rep, Seed = seed_val, .before = 1)
-    
+
     for (ds in names(datasets)) {
       for (m in methods_list) {
         cat("\n--- Replicate", rep, "-", m, "on", ds, "---\n")
-        
+
         api_key <- if (m == "DeepSeek") {
           deepseek_key
         } else {
           NULL
         }
-        
+
         if (m == "DeepSeek" && (is.null(api_key) || api_key == "")) {
           cat("Skipping ", m, ": API key not set.\n", sep = "")
           next
         }
-        
+
+        if (m == "CellTypist" && tolower(datasets[[ds]]$species) != "human") {
+          cat("Skipping CellTypist on ", ds, ": human-only baseline configuration.\n", sep = "")
+          next
+        }
+
         row <- tryCatch(
           run_benchmark_wrapper(
             dataset_name = ds,
@@ -461,7 +470,7 @@ run_replicated_benchmark <- function(n_replicates = 1,
             NULL
           }
         )
-        
+
         if (!is.null(row)) {
           row$Replicate <- rep
           all_results[[length(all_results) + 1]] <- row
@@ -469,11 +478,11 @@ run_replicated_benchmark <- function(n_replicates = 1,
       }
     }
   }
-  
+
   if (length(all_results) == 0) return(NULL)
-  
+
   full <- bind_rows(all_results)
-  
+
   full <- full %>%
     mutate(across(where(is.numeric), ~ ifelse(is.nan(.x), NA_real_, .x)))
 
@@ -495,7 +504,7 @@ run_replicated_benchmark <- function(n_replicates = 1,
     x <- x[!is.na(x)]
     if (length(x) < 2) NA_real_ else stats::qt(0.975, df = length(x) - 1) * stats::sd(x) / sqrt(length(x))
   }
-  
+
   summary <- full %>%
     group_by(Dataset, Tissue, Species, Method) %>%
     summarise(
@@ -518,7 +527,7 @@ run_replicated_benchmark <- function(n_replicates = 1,
       NClusters = mean_or_na(NClusters),
       .groups = "drop"
     )
-  
+
   list(
     full = full,
     summary = summary,
@@ -530,7 +539,7 @@ run_replicated_benchmark <- function(n_replicates = 1,
 plot_summary_with_sd <- function(summary_df,
                                  metric = "MacroF1",
                                  output_pdf = "benchmark_plot_with_sd.pdf") {
-  
+
   mean_col <- paste0(metric, "_mean")
   err_col <- paste0(metric, "_ci95")
 
@@ -550,7 +559,7 @@ plot_summary_with_sd <- function(summary_df,
   if (bounded_metric) {
     summary_df$ErrorMax <- pmin(summary_df$ErrorMax, 1)
   }
-  
+
   p <- ggplot(
     summary_df,
     aes(x = Method, y = .data[[mean_col]], fill = Method)
@@ -571,16 +580,16 @@ plot_summary_with_sd <- function(summary_df,
       y = metric
     ) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
+
   ggsave(output_pdf, p, width = 14, height = 8)
   message("Plot saved to ", output_pdf)
-  
+
   invisible(p)
 }
 
 plot_global_metric <- function(summary_df, metric, output_pdf) {
   mean_col <- paste0(metric, "_mean")
-  
+
   p <- ggplot2::ggplot(
     summary_df,
     ggplot2::aes(
@@ -597,7 +606,7 @@ plot_global_metric <- function(summary_df, metric, output_pdf) {
       x = "Dataset",
       y = metric
     )
-  
+
   ggplot2::ggsave(output_pdf, p, width = 11, height = 7)
   invisible(p)
 }
@@ -620,7 +629,11 @@ write_benchmark_manifest <- function(results,
     "",
     "Interpretation notes:",
     "- DeepSeekCell is evaluated as a closed-label, marker-guided annotation workflow.",
-    "- SingleR and scType are evaluated as conventional baseline methods on the same Seurat clustering.",
+    "- SingleR, scType, scmap, and CellTypist are evaluated as baseline methods when their dependencies are available.",
+    "- scmap is run with scmapCell nearest-neighbor label transfer before cluster-level majority voting.",
+    "- CellTypist is evaluated on cluster-average pseudo-profiles using tissue-aware pretrained models unless CELLTYPIST_MODEL overrides the model choice.",
+    "- Pairwise Wilcoxon and Friedman test outputs are exploratory because replicate blocks are small and some datasets are deterministic.",
+    "- LLM stability is summarized for fixed cluster structures using per-cluster debug prediction files.",
     "- Results summarize cluster-level labels after explicit label harmonization.",
     "- Clade accuracy uses the package Cell Ontology mapper and lineage relation checks.",
     "- Treat datasets with low cluster purity as lower-confidence benchmark evidence.",
@@ -632,15 +645,40 @@ write_benchmark_manifest <- function(results,
   writeLines(lines, output_file)
 }
 
+available_benchmark_methods <- function(requested_methods) {
+  selected <- character()
+
+  for (method in requested_methods) {
+    if (identical(method, "scmap") && !is_scmap_available()) {
+      message("Skipping scmap: Bioconductor package scmap is not installed.")
+      next
+    }
+
+    if (identical(method, "CellTypist") && !is_celltypist_available()) {
+      message(
+        "Skipping CellTypist: reticulate or Python modules ",
+        "celltypist/anndata/numpy are not available."
+      )
+      next
+    }
+
+    selected <- c(selected, method)
+  }
+
+  selected
+}
+
 main <- function(n_replicates = 1) {
   deepseek_key <- Sys.getenv("DEEPSEEK_API_KEY")
-  
+
   ont_data <- load_benchmark_ontology(ONTOLOGY_FILE)
   sctype_db_path <- find_sctype_db()
-  
-  methods <- c("DeepSeek", "scType", "SingleR")
-  
-  
+
+  methods <- available_benchmark_methods(
+    c("DeepSeek", "scType", "SingleR", "scmap", "CellTypist")
+  )
+
+
   results <- run_replicated_benchmark(
     n_replicates = n_replicates,
     methods_list = methods,
@@ -648,12 +686,12 @@ main <- function(n_replicates = 1) {
     sctype_db_path = sctype_db_path,
     deepseek_key = deepseek_key
   )
-  
+
   if (is.null(results)) {
     message("No benchmark results produced.")
     return(invisible(NULL))
   }
-  
+
   dir.create("results", showWarnings = FALSE)
 
   write.csv(results$full, "results/benchmark_results_full.csv", row.names = FALSE)
@@ -662,7 +700,7 @@ main <- function(n_replicates = 1) {
   write.csv(results$cluster_summary, "results/cluster_summary.csv", row.names = FALSE)
   writeLines(capture.output(sessionInfo()), "results/sessionInfo.txt")
   write_benchmark_manifest(results, methods, n_replicates)
-  
+
   final_table <- results$summary %>%
     dplyr::select(
       Dataset,
@@ -686,15 +724,32 @@ main <- function(n_replicates = 1) {
       MeanClusterPurity_mean
     ) %>%
     dplyr::arrange(Dataset, desc(MacroF1_mean))
-  
+
   write.csv(
     final_table,
     "results/final_benchmark_table.csv",
     row.names = FALSE
   )
-  
+
+  statistical_tests <- run_benchmark_statistical_tests(results$full)
+  write.csv(
+    statistical_tests$pairwise_wilcoxon,
+    "results/benchmark_pairwise_wilcoxon.csv",
+    row.names = FALSE
+  )
+  write.csv(
+    statistical_tests$friedman,
+    "results/benchmark_friedman_tests.csv",
+    row.names = FALSE
+  )
+  write.csv(
+    statistical_tests$llm_stability,
+    "results/benchmark_llm_stability.csv",
+    row.names = FALSE
+  )
+
   print(results$summary)
-  
+
   plot_summary_with_sd(results$summary, metric = "MacroF1", output_pdf = "results/benchmark_macroF1.pdf")
   plot_summary_with_sd(results$summary, metric = "Accuracy", output_pdf = "results/benchmark_accuracy.pdf")
   plot_summary_with_sd(results$summary, metric = "CladeAcc", output_pdf = "results/benchmark_clade_accuracy.pdf")
@@ -703,7 +758,7 @@ main <- function(n_replicates = 1) {
   plot_global_metric(results$summary, "MacroF1", "results/global_MacroF1.pdf")
   plot_global_metric(results$summary, "Accuracy", "results/global_Accuracy.pdf")
   plot_global_metric(results$summary, "RuntimeSec", "results/global_Runtime.pdf")
-  
+
   invisible(results)
 }
 

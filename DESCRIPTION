@@ -1,14 +1,14 @@
 Package: DeepSeekCell
 Title: Ontology-Guided LLM Cell Type Annotation for Single-Cell RNA-seq
-Version: 2.1.0
+Version: 0.1.0
 Date: 2026-06-11
 Authors@R: c(
-    person("Shu-Lin", "Wang", email = "books@hnu.edu.cn", role = c("aut", "cre")),
-    person("DeepSeekCell contributors", role = "ctb"),
+    person("Mohamed", "Kone", role = "aut"),
+    person("Shulin", "Wang", email = "books@hnu.edu.cn", role = c("aut", "cre")),
     person("Hunan University", role = "cph")
   )
-Author: Shu-Lin Wang [aut, cre], DeepSeekCell contributors [ctb], Hunan University [cph]
-Maintainer: Shu-Lin Wang <books@hnu.edu.cn>
+Author: Mohamed Kone [aut], Shulin Wang [aut, cre], Hunan University [cph]
+Maintainer: Shulin Wang <books@hnu.edu.cn>
 Description: Provides an ontology-guided large language model framework and
     interactive Shiny platform for explainable cell type annotation in
     single-cell RNA sequencing. The package converts cluster marker genes into

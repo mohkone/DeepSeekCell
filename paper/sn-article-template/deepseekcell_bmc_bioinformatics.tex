@@ -1,0 +1,441 @@
+% DeepSeekCell manuscript adapted for the Springer Nature/BMC sn-article template.
+% Original template files are retained in this folder.
+
+\documentclass[referee,lineno,pdflatex,sn-vancouver-num]{sn-jnl}
+
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage[title]{appendix}
+\usepackage{xcolor}
+\usepackage{textcomp}
+\usepackage{manyfoot}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+
+\raggedbottom
+\articletype{Software}
+
+\begin{document}
+
+\title[Ontology-guided LLM annotation]{DeepSeekCell: an ontology-guided large language model framework and interactive Shiny platform for explainable cell type annotation in single-cell RNA sequencing}
+
+\author[1]{\fnm{Mohamed} \sur{Kone}}
+\author*[1]{\fnm{Shulin} \sur{Wang}}\email{books@hnu.edu.cn}
+
+\affil*[1]{\orgname{Hunan University}, \orgaddress{\city{Changsha}, \country{China}}}
+
+\abstract{\textbf{Background:} Accurate cell type annotation remains a critical step in single-cell RNA sequencing (scRNA-seq) analysis. Existing approaches such as reference-based mapping and marker database methods often depend on predefined reference atlases, species-specific databases, or manually curated marker sets. Recent advances in large language models (LLMs) provide new opportunities for biological knowledge-driven annotation; however, current approaches frequently lack explainability, ontology integration, and user-friendly interfaces for routine biomedical research.
+
+\textbf{Results:} We developed DeepSeekCell, an ontology-guided LLM framework and interactive Shiny platform for explainable cell type annotation in scRNA-seq studies. DeepSeekCell accepts cluster-specific marker genes and uses a structured prompting strategy to infer biologically meaningful cell identities while providing confidence scores, tissue-consistency assessment, mixture detection, and concise biological reasoning. To improve standardization and interoperability, predicted annotations are automatically mapped to Cell Ontology identifiers through exact, synonym-based, tissue-aware, and conservative fuzzy matching strategies. We further developed an interactive Shiny application supporting DeepSeek API and local Ollama models, real-time visualization, ontology-linked outputs, and exportable reports.
+
+Benchmarking was performed under a marker-driven cluster annotation scenario across six publicly available scRNA-seq datasets representing immune, pancreatic, brain, and lung tissues. DeepSeekCell was compared with ScType, SingleR, scmap, and an exploratory CellTypist baseline. DeepSeekCell achieved perfect performance on PBMC data (ARI = 1.00, Macro-F1 = 1.00, Accuracy = 1.00) and obtained the highest adjusted Rand index on both brain datasets (TasicBrain ARI = 0.866; ZeiselBrain ARI = 0.684). Among methods evaluated on all six datasets, DeepSeekCell achieved the highest mean macro-F1 score (0.818), mean exact accuracy (0.810), and mean ontology-aware clade accuracy (0.868), with mean runtime of 1.87 seconds. Ontology mapping improved interpretability through standardized Cell Ontology identifiers and explicit match provenance.
+
+\textbf{Conclusions:} DeepSeekCell demonstrates that ontology-guided LLMs can provide accurate, explainable, and computationally efficient cell type annotation for scRNA-seq analysis. By combining biological reasoning, Cell Ontology integration, and an interactive Shiny interface, DeepSeekCell offers a practical framework for reproducible and interpretable cell annotation across diverse tissues and species.}
+
+\keywords{single-cell RNA sequencing, cell type annotation, large language models, Cell Ontology, explainable artificial intelligence, Shiny application, DeepSeek, bioinformatics}
+
+\maketitle
+
+\section{Introduction}\label{sec:introduction}
+
+Single-cell RNA sequencing (scRNA-seq) enables high-resolution analysis of cellular heterogeneity across tissues, development, and disease. A central interpretive step in scRNA-seq analysis is assigning biological identities to transcriptionally defined clusters or individual cells. In practice, this process often relies on expert interpretation of marker genes, comparison with reference atlases, and iterative inspection of tissue context. Manual annotation is powerful, but it can be subjective, labor-intensive, and difficult to reproduce across laboratories.
+
+Automated annotation methods have improved scalability. Reference-based approaches such as SingleR and scmap compare query profiles with labeled references or projected cell states \cite{aran2019singler,singlerbook,kiselev2018scmap}. Marker- and model-guided approaches such as ScType, CellAssign, Garnett, and CellTypist use curated marker combinations, probabilistic assignment, supervised classification, or pretrained cell type models to identify cell identities \cite{ianevski2022sctype,zhang2019cellassign,pliner2019garnett,dominguezconde2022celltypist}. These methods are widely useful, but each depends on the quality, coverage, and specificity of reference data, marker databases, or training labels. They can also return labels that differ in granularity, terminology, or ontology compatibility, making downstream comparison across datasets difficult.
+
+Large language models (LLMs) offer a complementary strategy because they can reason over marker gene lists and tissue context using broad biomedical knowledge. Direct applications to scRNA-seq annotation include GPTCelltype, which evaluated GPT-4 for marker-based cell type assignment \cite{hou2024gpt4}, scExtract for automated annotation and prior-informed integration \cite{wu2025scextract}, CASSIA for multi-agent interpretable annotation \cite{xie2025cassia}, mLLMCelltype for multi-model consensus annotation \cite{yang2026mllmcelltype}, LICT for reliability assessment \cite{ye2025lict}, AnnDictionary for benchmarking LLM behavior across cell and gene-set tasks \cite{crowley2025anndictionary}, and DeepCellSeek for large-scale benchmarking of multiple LLM families in cell typing \cite{xiao2025deepcellseek}. In parallel, single-cell foundation and language-inspired models such as scBERT, Geneformer, scGPT, and scFoundation have shown the value of large-scale transcriptomic pretraining for cell representation, network biology, and downstream annotation tasks \cite{yang2022scbert,theodoris2023geneformer,cui2024scgpt,hao2024scfoundation}.
+
+Broader biomedical and omics-oriented LLM work further motivates this direction. Domain-adapted biomedical LLMs such as BioGPT and Med-PaLM illustrate the value and limitations of specializing language models for biomedical literature, question answering, and reasoning \cite{luo2022biogpt,singhal2023medpalm}. Tool-augmented approaches such as GeneGPT show that LLMs can be connected to external biomedical resources \cite{jin2024genegpt}, while recent gene-set interpretation systems demonstrate that LLMs can synthesize functional hypotheses from omics-derived gene groups but require safeguards against hallucination and unsupported claims \cite{hu2025genesetllm,wang2025geneagent}. However, free-text LLM annotation introduces new challenges: outputs may be inconsistent across runs, difficult to validate automatically, weakly linked to controlled vocabularies, and insufficiently transparent for publication-grade analysis. For scRNA-seq annotation, an LLM-based system should therefore constrain outputs, expose reasoning, map labels to formal ontologies, and provide reproducible exports.
+
+Despite rapid progress, there remains a need for annotation systems that combine biological knowledge-driven prediction, formal ontology integration, explainability, and an accessible interface for routine biomedical research. DeepSeekCell was designed to address this gap. The framework combines marker-guided LLM annotation with Cell Ontology normalization \cite{cellontology,tan2025cellontology}, validation, and an interactive Shiny interface \cite{shiny}. Its main contributions are: (i) structured LLM-based annotation from cluster marker genes, (ii) tissue-aware Cell Ontology mapping with match provenance, (iii) explainable outputs including confidence, reasoning, tissue consistency, and mixed-cell assessment, (iv) an interactive Shiny platform for visualization and report export, and (v) reproducible benchmark scripts comparing DeepSeekCell with established annotation methods across immune, pancreatic, brain, and lung datasets, with dependency-aware support for additional scmap and CellTypist baselines.
+
+\section{Methods}\label{sec:methods}
+
+\subsection{Overall framework}
+
+DeepSeekCell is implemented as an R package with an interactive Shiny application. The overall workflow is: input marker genes, prompt engineering, DeepSeek or Ollama annotation, structured JSON parsing, ontology mapping, validation, visualization, and export. The package provides functions for marker preprocessing, prompt construction, LLM API access, response parsing, Cell Ontology mapping, validation, visualization, report generation, and benchmarking. The Shiny application is located in \texttt{inst/shiny/app.R} and provides a browser-based workflow for entering marker genes, selecting model and metadata options, running annotation, inspecting results, viewing confidence summaries, reviewing explainability fields, and exporting reports.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{deepseekcell_workflow.pdf}
+\caption{DeepSeekCell workflow. Cluster marker genes, tissue, and species metadata are submitted through the R API or Shiny interface. The framework applies marker processing and prompt engineering, sends a structured prompt to the selected DeepSeek or Ollama backend, parses the JSON response, maps the annotation to the Cell Ontology, validates the output, visualizes confidence and ontology metadata, and exports tabular or HTML reports with marker-based reasoning.}\label{fig:workflow}
+\end{figure}
+
+The current software version is 0.1.0. OpenAI/GPT-4o support was removed from the maintained application surface to keep the publication version focused, reproducible, and aligned with the DeepSeekCell naming and benchmark design.
+
+\begin{table}[h]
+\caption{Main DeepSeekCell software features.}\label{tab:features}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Feature & DeepSeekCell support\\
+\midrule
+Marker-guided annotation & Yes\\
+Interactive Shiny interface & Yes\\
+Cell Ontology ID mapping & Yes\\
+Ontology match provenance & Exact, synonym, context exact, fuzzy\\
+Explainable marker reasoning & Yes\\
+Confidence score & Yes\\
+Tissue consistency flag & Yes\\
+Mixed-cluster flag & Yes\\
+CSV, XLSX, and HTML export & Yes\\
+Benchmark scripts & Yes\\
+Offline fallback ontology & Yes\\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Marker gene processing}
+
+DeepSeekCell accepts per-cluster marker genes as comma-, semicolon-, whitespace-, or newline-separated text. Marker processing standardizes gene symbols, removes duplicates, filters common low-information genes, including mitochondrial, ribosomal, and pseudogene-like features, and preserves the top marker genes selected from upstream clustering analysis. The benchmark workflow used the top 25 marker genes per cluster. The Shiny interface currently accepts marker genes for up to five clusters, while the R interface can be used programmatically for larger analyses.
+
+\subsection{Prompt engineering strategy}
+
+For each dataset or user submission, DeepSeekCell constructs a structured prompt containing tissue, species, cluster marker genes, output schema requirements, and ontology-aware annotation instructions. The prompt includes tissue priors, species context, contamination detection instructions, mixed-cell detection instructions, confidence estimation requirements, and concise biological reasoning requirements. The model is instructed to return structured annotation records containing cluster ID, predicted cell type, confidence, tissue consistency, mixed-cluster status, and marker-based reasoning.
+
+\subsection{LLM annotation engine}
+
+The maintained model backends are the DeepSeek API and local Ollama models. DeepSeek mode supports API-based annotation using the configured model endpoint and key. Ollama mode supports local inference for users who require offline or private annotation workflows. The benchmark configuration used temperature 0 to reduce stochastic variation in model output. Response parsing is robust to extra prose and code fences, and confidence values are normalized to the 0--1 range.
+
+\subsection{Ontology-guided annotation}
+
+DeepSeekCell maps predicted cell type labels to Cell Ontology identifiers using a staged strategy: exact label matching, synonym matching, tissue-context disambiguation for common ambiguous labels, conservative fuzzy matching when exact or synonym matches fail, and fallback ontology mappings for offline tests and graceful failure. The ontology loader uses the full Cell Ontology OBO file when available and caches parsed ontology content safely. The benchmark run loaded 3,437 Cell Ontology terms from \texttt{data/cl.obo}. The mapping layer records the Cell Ontology ID, ontology label, match method, and match score, which helps distinguish exact mappings from inferred or lower-confidence mappings. Context-specific mappings were added for pancreas, brain, and lung to reduce common ambiguity, including pancreatic endocrine labels, neural/glial labels, and lung epithelial or immune labels.
+
+\subsection{Explainability framework}
+
+DeepSeekCell exposes annotation reasoning in both the R output and the Shiny interface. For each cluster, the result can include cell type, confidence score, marker genes used by the model, a natural-language reasoning statement, tissue-consistency classification, mixed-cluster status, Cell Ontology identifier, ontology label, match method, and ontology match score. The validation module reports missing clusters, unknown annotations, low-confidence predictions, ontology coverage, and overall quality summaries.
+
+\subsection{Shiny application}
+
+The Shiny application provides a practical interface for non-programmatic annotation. Users enter an API key or use a local model, choose tissue and species, enter marker genes, optionally map annotations to the Cell Ontology, and run annotation. Results are displayed in tabbed views covering predicted labels, confidence, tissue consistency, mixed status, Cell Ontology IDs, ontology labels, explainability, cost and performance, metadata, and help text. Results can be exported as CSV, Excel, or HTML reports.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{deepseekcell_shiny_interface.png}
+\caption{DeepSeekCell Shiny interface for interactive cell type annotation. The application accepts cluster marker genes, displays predicted cell types with confidence scores and Cell Ontology identifiers, and provides explainability, validation, cost, metadata, and report export views.}\label{fig:shiny}
+\end{figure}
+
+\subsection{Benchmark datasets}
+
+We evaluated DeepSeekCell using a closed-label, marker-guided benchmark. DeepSeekCell is intended as a marker-driven annotation framework for cluster marker lists rather than a raw expression matrix classifier; therefore, the benchmark was designed to evaluate annotation from cluster-level markers. Six curated datasets were included: PBMC, BaronPancreas, MuraroPancreas, TasicBrain, ZeiselBrain, and ZilionisLung. The datasets spanned human PBMC, human pancreas, mouse brain, and human lung. For each dataset, Seurat-based preprocessing and clustering were used to produce cluster-level marker genes \cite{hao2021seurat,seurat}. The benchmark used the top 25 marker genes per cluster, Seurat resolution 0.5, and 50 principal components. Three benchmark replicates were run with seeds 100, 200, and 300. Fixed datasets were deterministic across replicates, while the ZilionisLung dataset used seed-dependent cell subsampling.
+
+\subsection{Evaluation metrics}
+
+DeepSeekCell was compared with SingleR, ScType, scmap, and CellTypist on the same cluster structure. SingleR, ScType, and scmap predictions were converted to cluster-level labels by majority vote where needed. scmap was evaluated using scmapCell nearest-neighbor label transfer, followed by cluster-level majority voting. CellTypist was evaluated on cluster-average pseudo-profiles using tissue-aware pretrained models where available: an immune model for PBMC, an adult pancreatic islet model for pancreas, and the Human Lung Atlas model for lung. Because CellTypist is primarily designed for cell-level log-normalized expression matrices, this configuration was treated as a comparative cluster-level baseline rather than a native CellTypist workflow. CellTypist was evaluated on human datasets and skipped for the two mouse brain datasets. A specific CellTypist model can be selected through the \texttt{CELLTYPIST\_MODEL} environment variable. Optional baselines are skipped with an explicit message if their R or Python dependencies are unavailable. Predicted and reference labels were harmonized through explicit tissue-aware label rules before metric calculation.
+
+Annotation performance was evaluated using adjusted Rand index (ARI), macro-F1 score, exact cluster-level accuracy, balanced accuracy, ontology-aware clade accuracy, unknown-label rate, ontology coverage, runtime, and LLM token/cost metadata. Ontology-aware clade accuracy considers a prediction correct when the predicted and reference labels are ontologically related at an accepted lineage level, allowing biologically related predictions to be distinguished from unrelated errors. Exploratory statistical comparisons were performed using paired Wilcoxon signed-rank tests across dataset-replicate blocks, comparing DeepSeekCell with each baseline for each metric. Friedman tests were used as omnibus repeated-measures tests across complete method sets. These tests were interpreted cautiously because only three replicates were available and several datasets were deterministic across replicates.
+
+\subsubsection{Mathematical definition of evaluation metrics}
+
+Let a benchmark dataset contain $n$ evaluated clusters. For cluster $i$, let $y_i$ denote the harmonized reference label and $\hat{y}_i$ denote the harmonized predicted label. Let $\mathcal{L}$ be the set of evaluated cell type labels and let $\mathbb{I}(\cdot)$ be the indicator function. Exact cluster-level accuracy was defined as
+\begin{equation}
+\mathrm{Accuracy}=\frac{1}{n}\sum_{i=1}^{n}\mathbb{I}(\hat{y}_i=y_i).
+\label{eq:accuracy}
+\end{equation}
+
+For each label $\ell \in \mathcal{L}$, precision and recall were calculated from true positives ($TP_\ell$), false positives ($FP_\ell$), and false negatives ($FN_\ell$):
+\begin{equation}
+P_\ell=\frac{TP_\ell}{TP_\ell+FP_\ell}, \qquad
+R_\ell=\frac{TP_\ell}{TP_\ell+FN_\ell}.
+\label{eq:precision-recall}
+\end{equation}
+The macro-F1 score was then computed as the unweighted mean of class-specific F1 scores:
+\begin{equation}
+\mathrm{MacroF1}=\frac{1}{|\mathcal{L}|}\sum_{\ell\in\mathcal{L}}
+\frac{2P_\ell R_\ell}{P_\ell+R_\ell}.
+\label{eq:macrof1}
+\end{equation}
+Balanced accuracy was computed as the unweighted mean recall:
+\begin{equation}
+\mathrm{BalancedAccuracy}=\frac{1}{|\mathcal{L}|}\sum_{\ell\in\mathcal{L}}R_\ell.
+\label{eq:balancedaccuracy}
+\end{equation}
+
+The adjusted Rand index was calculated from the contingency table $n_{ab}$ between predicted groups $a$ and reference groups $b$:
+\begin{equation}
+\mathrm{ARI}=
+\frac{
+\sum_{ab}\binom{n_{ab}}{2}
+-\frac{\sum_a\binom{n_{a\cdot}}{2}\sum_b\binom{n_{\cdot b}}{2}}{\binom{n}{2}}
+}{
+\frac{1}{2}\left[\sum_a\binom{n_{a\cdot}}{2}+\sum_b\binom{n_{\cdot b}}{2}\right]
+-\frac{\sum_a\binom{n_{a\cdot}}{2}\sum_b\binom{n_{\cdot b}}{2}}{\binom{n}{2}}
+}.
+\label{eq:ari}
+\end{equation}
+
+To incorporate Cell Ontology structure, each harmonized label was mapped to an ontology term when possible. Let $\Omega(\hat{y}_i,y_i)=1$ if the predicted and reference labels are exact matches or if their mapped Cell Ontology terms are accepted ancestor/descendant lineage relatives, and $\Omega(\hat{y}_i,y_i)=0$ otherwise. Ontology-aware clade accuracy was defined as
+\begin{equation}
+\mathrm{CladeAccuracy}=\frac{1}{n}\sum_{i=1}^{n}\Omega(\hat{y}_i,y_i).
+\label{eq:cladeaccuracy}
+\end{equation}
+The unknown-label rate was defined as
+\begin{equation}
+\mathrm{UnknownRate}=\frac{1}{n}\sum_{i=1}^{n}\mathbb{I}(\hat{y}_i=\mathrm{Unknown}).
+\label{eq:unknownrate}
+\end{equation}
+For each metric $m$ summarized across $R$ benchmark replicates, the reported mean and 95\% confidence interval were
+\begin{equation}
+\bar{m}=\frac{1}{R}\sum_{r=1}^{R}m_r,\qquad
+\mathrm{CI}_{95}=t_{0.975,R-1}\frac{s_m}{\sqrt{R}},
+\label{eq:ci}
+\end{equation}
+where $s_m$ is the standard deviation across replicates. Confidence intervals are zero for deterministic datasets and nonzero for seed-dependent subsampling results.
+
+\begin{table}[h]
+\caption{Benchmark datasets and preprocessing summary. Values are taken from the final three-replicate benchmark manifest. ZilionisLung cluster counts varied across seed-dependent subsampling replicates.}\label{tab:datasets}
+\begin{tabular}{@{}llllrrrr@{}}
+\toprule
+Dataset & Tissue & Species & Cells & Genes & Clusters & Mean purity & Min purity\\
+\midrule
+PBMC & PBMC & Human & 2,700 & 13,714 & 8 & 0.941 & 0.844\\
+BaronPancreas & Pancreas & Human & 8,569 & 20,125 & 16 & 0.952 & 0.534\\
+MuraroPancreas & Pancreas & Human & 2,122 & 19,059 & 11 & 0.954 & 0.892\\
+TasicBrain & Brain & Mouse & 1,809 & 24,058 & 15 & 0.929 & 0.692\\
+ZeiselBrain & Brain & Mouse & 3,005 & 20,006 & 16 & 0.773 & 0.504\\
+ZilionisLung & Lung & Human & 5,000 & 41,861 & 16--18 & 0.910 & 0.406--0.660\\
+\botrule
+\end{tabular}
+\end{table}
+
+\section{Results}\label{sec:results}
+
+\subsection{DeepSeekCell architecture}
+
+DeepSeekCell was implemented as an end-to-end annotation workflow connecting marker gene input, prompt engineering, LLM annotation, structured response parsing, ontology mapping, validation, visualization, and export (Fig.~\ref{fig:workflow}). This design separates biological reasoning from post-processing: the LLM proposes a biologically plausible identity and explanation, while deterministic downstream modules standardize labels, map them to Cell Ontology identifiers, validate completeness, and prepare reproducible outputs.
+
+\subsection{Ontology mapping performance}
+
+The ontology layer mapped predicted cell type labels using exact matching, synonym matching, tissue-aware disambiguation, and conservative fuzzy matching. The final benchmark loaded 3,437 Cell Ontology terms and stored mapping provenance for each resolved annotation, including Cell Ontology identifier, ontology label, match method, and match score. Tissue-aware mappings improved ambiguous cases such as pancreatic alpha, beta, delta, acinar, and ductal cells; brain neuronal and glial labels; and lung epithelial, stromal, and immune labels. This standardized output supports cross-dataset comparison and allows ontology-aware clade accuracy to complement exact string matching.
+
+\subsection{Benchmarking against existing methods}
+
+The final benchmark run used three replicates and completed all reported method-dataset combinations, resulting in 84 full result rows and 28 dataset-method summaries. DeepSeekCell, ScType, SingleR, and scmap were evaluated on all six datasets; CellTypist was evaluated on the four human datasets and skipped for the two mouse brain datasets. Every reported dataset-method combination had three successful runs. All clusters were evaluated, and no benchmark cluster truth remained labeled as unknown after label curation. The benchmark manifest recorded Cell Ontology loading, methods, top marker count, Seurat settings, cache version, and dataset quality summaries.
+
+Across the six datasets, DeepSeekCell achieved the highest average macro-F1, exact accuracy, and ontology-aware clade accuracy among methods evaluated on every dataset (Table~\ref{tab:overall}; Figs.~\ref{fig:macroF1} and \ref{fig:accuracy}). DeepSeekCell was especially strong in PBMC and TasicBrain datasets, where it achieved macro-F1 scores of 1.000 and 0.984, respectively. CellTypist matched DeepSeekCell on PBMC but showed lower performance on pancreas and lung in this cluster-pseudo-profile benchmark.
+
+\subsection{Aggregate benchmark performance}
+
+\begin{table}[h]
+\caption{Overall benchmark performance. Runtime is reported in seconds. CellTypist was evaluated on the four human datasets; the other methods were evaluated on all six datasets.}\label{tab:overall}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Method & Datasets & Mean macro-F1 & Mean accuracy & Mean clade accuracy & Mean runtime\\
+\midrule
+DeepSeekCell & 6 & 0.818 & 0.810 & 0.868 & 1.87\\
+ScType & 6 & 0.749 & 0.773 & 0.778 & 1.75\\
+SingleR & 6 & 0.466 & 0.479 & 0.757 & 43.84\\
+scmap & 6 & 0.411 & 0.438 & 0.702 & 48.58\\
+CellTypist & 4 & 0.306 & 0.353 & 0.374 & 2.12\\
+\botrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{benchmark_macroF1.pdf}
+\caption{Macro-F1 performance of DeepSeekCell, ScType, SingleR, scmap, and CellTypist across benchmark datasets. Bars represent the mean across three benchmark replicates. Error bars represent 95\% confidence intervals when replicate variability is present. CellTypist was evaluated on human datasets only.}\label{fig:macroF1}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{benchmark_accuracy.pdf}
+\caption{Exact cluster-level annotation accuracy across benchmark datasets. DeepSeekCell achieved the highest average exact accuracy among methods evaluated on all six datasets, with strongest performance in PBMC and TasicBrain.}\label{fig:accuracy}
+\end{figure}
+
+\subsection{Exploratory statistical analysis}
+
+Paired Wilcoxon signed-rank tests were performed across dataset-replicate blocks using DeepSeekCell as the reference method. For macro-F1, DeepSeekCell significantly exceeded SingleR (BH-adjusted \(P=0.010\)) and scmap (BH-adjusted \(P=0.006\)), while the difference between DeepSeekCell and ScType was not significant (BH-adjusted \(P=0.570\)). For exact accuracy, DeepSeekCell significantly exceeded SingleR (BH-adjusted \(P=0.008\)) and scmap (BH-adjusted \(P=0.006\)), but not ScType (BH-adjusted \(P=0.567\)). Friedman tests across the four methods evaluated on all six datasets showed significant differences for macro-F1 (\(P=2.44\times10^{-4}\)), accuracy (\(P=5.68\times10^{-4}\)), ontology-aware clade accuracy (\(P=0.004\)), and runtime (\(P=7.86\times10^{-10}\)). Full test outputs are provided in Supplementary Tables S6 and S7.
+
+\subsection{Dataset-level benchmark performance}
+
+In BaronPancreas, ScType achieved the highest macro-F1 (0.947), followed closely by DeepSeekCell (0.926). In MuraroPancreas, ScType again had the highest macro-F1 (0.958), while DeepSeekCell remained competitive (0.917). SingleR and scmap showed lower exact accuracy in both pancreas datasets but high ontology-aware clade accuracy, suggesting that some predictions were ontologically related even when exact labels differed. CellTypist performance was low in the pancreas benchmarks despite use of a pancreatic islet model, reflecting the difficulty of applying pretrained cell-level models to cluster-average pseudo-profiles and cross-study label granularity.
+
+In TasicBrain, DeepSeekCell slightly exceeded ScType in macro-F1 and achieved perfect clade accuracy. In ZeiselBrain, all methods showed lower macro-F1 compared with other datasets, consistent with the lower mean cluster purity of this dataset (0.773). ScType and SingleR had similar macro-F1 values in ZeiselBrain, while DeepSeekCell achieved lower macro-F1 but retained strong ontology-aware clade accuracy (0.800), indicating partially correct higher-level biological labeling.
+
+In ZilionisLung, SingleR achieved the highest macro-F1 (0.659), followed by DeepSeekCell (0.619), scmap (0.528), ScType (0.163), and CellTypist (0.061). DeepSeekCell and SingleR had nearly identical ontology-aware clade accuracy (0.685 and 0.684, respectively; Fig.~\ref{fig:cladeacc}). Confidence intervals were nonzero in ZilionisLung because cell subsampling varied across benchmark seeds, producing 16--18 clusters across replicates. Runtime comparisons are shown in Fig.~\ref{fig:runtime}.
+
+\begin{table}[h]
+\caption{Dataset-level macro-F1 summary.}\label{tab:datasetlevel}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Dataset & Tissue & Best method & Best macro-F1 & DeepSeekCell macro-F1\\
+\midrule
+PBMC & PBMC & DeepSeekCell & 1.000 & 1.000\\
+BaronPancreas & Pancreas & ScType & 0.947 & 0.926\\
+MuraroPancreas & Pancreas & ScType & 0.958 & 0.917\\
+TasicBrain & Brain & DeepSeekCell & 0.984 & 0.984\\
+ZeiselBrain & Brain & ScType & 0.580 & 0.465\\
+ZilionisLung & Lung & SingleR & 0.659 & 0.619\\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Explainability analysis}
+
+DeepSeekCell outputs concise biological reasoning alongside each predicted label. For PBMC-like marker sets, expression of canonical T cell genes such as \textit{CD3D} and \textit{CD3E} supports T cell annotation and mapping to CL:0000084. For pancreatic endocrine marker sets, expression of \textit{INS} and \textit{IAPP} supports beta cell annotation and mapping to CL:0000169. These examples illustrate how DeepSeekCell connects marker evidence, cell type prediction, confidence, tissue consistency, and ontology identifiers in a single reviewable output.
+
+\subsection{LLM reproducibility and stability}
+
+The benchmark used a temperature of 0 for DeepSeek API calls to reduce stochastic variation. Per-cluster debug files were used to assess DeepSeekCell label stability across the five fixed cluster-structure datasets. Across PBMC, BaronPancreas, MuraroPancreas, TasicBrain, and ZeiselBrain, all 66 comparable clusters had identical raw and harmonized DeepSeekCell predictions across the three benchmark replicates, corresponding to an overall fixed-dataset stability rate of 1.000. The ZilionisLung dataset was excluded from this label-stability summary because seed-dependent subsampling changed the cluster structures across replicates. Full stability summaries are provided in Supplementary Table S8.
+
+\begin{table}[h]
+\caption{DeepSeekCell annotation stability across repeated benchmark runs. Stability was calculated as the proportion of comparable clusters with identical harmonized DeepSeekCell labels across three benchmark replicates. ZilionisLung was excluded because seed-dependent cell subsampling changed the cluster structure across replicates.}\label{tab:stability}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Dataset & Comparable clusters & Replicates & Stability (\%)\\
+\midrule
+PBMC & 8 & 3 & 100.0\\
+BaronPancreas & 16 & 3 & 100.0\\
+MuraroPancreas & 11 & 3 & 100.0\\
+TasicBrain & 15 & 3 & 100.0\\
+ZeiselBrain & 16 & 3 & 100.0\\
+Overall fixed-dataset summary & 66 & 3 & 100.0\\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Exploratory CellTypist baseline}
+
+CellTypist was included as an exploratory human-dataset baseline rather than as a primary benchmark endpoint, because the present benchmark evaluates cluster marker or cluster-level annotation whereas CellTypist is designed primarily for cell-level log-normalized expression matrices. In this cluster-average pseudo-profile setting, CellTypist matched DeepSeekCell on PBMC but showed lower performance on pancreas and lung datasets. These results are useful for context, but they should not be interpreted as a definitive evaluation of native CellTypist performance.
+
+\subsection{Computational performance}
+
+DeepSeekCell produced rapid marker-guided annotations across datasets, with mean runtimes between 1.47 and 2.82 seconds for the six benchmark datasets. ScType and CellTypist were also fast in this cluster-level benchmark, with average runtimes of 1.75 and 2.12 seconds, respectively. SingleR and scmap required substantially longer runtime in several datasets, including 203.77 and 203.28 seconds, respectively, for BaronPancreas. Runtime comparisons are shown in Fig.~\ref{fig:runtime}.
+
+\subsection{Interactive Shiny platform}
+
+The Shiny platform successfully loaded the Cell Ontology and displayed structured annotations containing predicted labels, confidence scores, tissue-consistency tags, mixed-cluster tags, Cell Ontology identifiers, ontology labels, match methods, and match scores. The explainability tab provided marker-based reasoning for each prediction, supporting review of why a label was assigned. Export functions generated CSV, Excel, and HTML outputs suitable for downstream reporting (Fig.~\ref{fig:shiny}).
+
+\begin{table}[p]
+\caption{Detailed dataset-level benchmark performance. Values are means across three benchmark replicates. CI values are omitted here for compactness and are available in \texttt{final\_benchmark\_table.csv}.}\label{tab:detailed}
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+Dataset & Method & Macro-F1 & Accuracy & Clade acc. & Unknown & Runtime\\
+\midrule
+BaronPancreas & ScType & 0.947 & 0.938 & 0.923 & 0.000 & 1.18\\
+BaronPancreas & DeepSeekCell & 0.926 & 0.813 & 0.846 & 0.000 & 1.77\\
+BaronPancreas & SingleR & 0.222 & 0.125 & 1.000 & 0.000 & 203.77\\
+BaronPancreas & scmap & 0.222 & 0.125 & 1.000 & 0.000 & 203.28\\
+BaronPancreas & CellTypist & 0.020 & 0.063 & 0.083 & 0.000 & 2.50\\
+MuraroPancreas & ScType & 0.958 & 0.909 & 0.889 & 0.000 & 1.78\\
+MuraroPancreas & DeepSeekCell & 0.917 & 0.818 & 0.875 & 0.091 & 2.82\\
+MuraroPancreas & CellTypist & 0.142 & 0.273 & 0.333 & 0.000 & 1.05\\
+MuraroPancreas & SingleR & 0.125 & 0.091 & 0.750 & 0.000 & 19.94\\
+MuraroPancreas & scmap & 0.125 & 0.091 & 0.750 & 0.000 & 11.76\\
+PBMC & CellTypist & 1.000 & 1.000 & 1.000 & 0.000 & 1.60\\
+PBMC & DeepSeekCell & 1.000 & 1.000 & 1.000 & 0.000 & 1.47\\
+PBMC & ScType & 0.875 & 0.875 & 0.875 & 0.000 & 1.66\\
+PBMC & SingleR & 0.542 & 0.625 & 0.714 & 0.000 & 4.46\\
+PBMC & scmap & 0.396 & 0.500 & 0.548 & 0.000 & 11.37\\
+TasicBrain & DeepSeekCell & 0.984 & 0.933 & 1.000 & 0.067 & 1.67\\
+TasicBrain & ScType & 0.971 & 0.933 & 0.933 & 0.000 & 0.94\\
+TasicBrain & SingleR & 0.667 & 0.600 & 0.643 & 0.067 & 6.30\\
+TasicBrain & scmap & 0.633 & 0.600 & 0.600 & 0.000 & 8.72\\
+ZeiselBrain & ScType & 0.580 & 0.750 & 0.813 & 0.000 & 0.86\\
+ZeiselBrain & SingleR & 0.579 & 0.750 & 0.750 & 0.000 & 8.69\\
+ZeiselBrain & scmap & 0.558 & 0.688 & 0.688 & 0.000 & 21.00\\
+ZeiselBrain & DeepSeekCell & 0.465 & 0.688 & 0.800 & 0.063 & 1.76\\
+ZilionisLung & SingleR & 0.659 & 0.684 & 0.684 & 0.000 & 19.86\\
+ZilionisLung & DeepSeekCell & 0.619 & 0.606 & 0.685 & 0.117 & 1.76\\
+ZilionisLung & scmap & 0.531 & 0.625 & 0.625 & 0.000 & 35.36\\
+ZilionisLung & ScType & 0.163 & 0.235 & 0.235 & 0.000 & 4.09\\
+ZilionisLung & CellTypist & 0.061 & 0.079 & 0.080 & 0.000 & 3.34\\
+\botrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{benchmark_clade_accuracy.pdf}
+\caption{Cell Ontology-aware clade accuracy across benchmark datasets. This metric credits predictions that are ontologically related to the reference label, capturing biologically meaningful agreement beyond exact string matching.}\label{fig:cladeacc}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{benchmark_runtime.pdf}
+\caption{Runtime comparison across evaluated methods. DeepSeekCell produced rapid marker-guided annotations, ScType and CellTypist were also fast in this cluster-level benchmark, and SingleR and scmap showed longer runtimes in larger reference-based comparisons.}\label{fig:runtime}
+\end{figure}
+
+\section{Discussion}\label{sec:discussion}
+
+DeepSeekCell demonstrates that ontology-guided LLM annotation can produce accurate, explainable, and standardized cell type labels from marker genes. The framework addresses several limitations of unconstrained LLM annotation by requiring structured outputs, validating results, and mapping labels to the Cell Ontology. Its main advantages are that it is explainable, fast, ontology-guided, reference-free at the annotation stage, compatible with multiple tissues and species, and accessible through an interactive Shiny interface for users who need annotation and exportable reports without writing custom code.
+
+The benchmark should be interpreted as a marker-driven cluster annotation benchmark rather than a raw expression matrix benchmark. This design matches the intended DeepSeekCell input representation and the common manual workflow in which analysts inspect top cluster markers before assigning identities. In this setting, DeepSeekCell was strongest when marker genes clearly encoded canonical cell identities, such as immune populations in PBMC and neuronal/glial classes in TasicBrain. In pancreas datasets, DeepSeekCell performed competitively with ScType, which benefits from marker database coverage for pancreatic endocrine and exocrine cell types. In the ZilionisLung dataset, SingleR performed best by macro-F1, while DeepSeekCell retained comparable ontology-aware clade accuracy, suggesting that ontology-level evaluation can capture biologically related predictions missed by exact string matching.
+
+The ZeiselBrain dataset highlights an important limitation: benchmark accuracy depends on cluster purity and label granularity. Lower mean cluster purity can make cluster-level annotation ambiguous for all methods. DeepSeekCell therefore reports tissue consistency, mixed-cluster flags, confidence, and ontology match metadata to help users identify annotations requiring manual review.
+
+This study has several limitations. First, the benchmark is cluster-level and marker-guided rather than cell-level across all methods, and therefore evaluates annotation from marker evidence rather than direct classification from raw or normalized expression matrices. Second, CellTypist was evaluated on cluster-average pseudo-profiles rather than its native cell-level workflow; therefore, comparisons involving CellTypist should be interpreted as exploratory rather than as the full native CellTypist use case. Third, the statistical analyses are exploratory because only three replicates were run and most datasets were deterministic across replicates; only the ZilionisLung dataset included seed-dependent subsampling variability. Fourth, stability was assessed at the label-output level for fixed benchmark cluster structures, but additional work is needed to test stability across model versions, prompt revisions, and larger repeated LLM call sets. Fifth, performance depends on prompt quality, model version, ontology coverage, marker gene quality, and the biomedical knowledge represented by the selected LLM. Sixth, DeepSeek API mode requires internet access and an API key, although local Ollama support can reduce this dependency. Seventh, rare cell types, poorly characterized states, and disease-specific phenotypes may remain difficult to annotate confidently. Finally, LLM-generated reasoning should be treated as an explanatory aid rather than independent biological proof.
+
+Future work will extend the Shiny platform to support automatic marker extraction from Seurat objects, file upload for arbitrary marker tables, larger cluster counts, multi-modal annotation, expanded ontology integration, fine-tuned biomedical LLMs, and optional offline annotation modes. Benchmark extensions should include more tissues, disease states, perturbation datasets, additional LLM backends, scmap and CellTypist reruns where the required reference models are available, and independent manual review of ambiguous cases.
+
+\section{Conclusions}\label{sec:conclusions}
+
+DeepSeekCell provides an ontology-guided LLM framework and Shiny platform for explainable scRNA-seq cell type annotation. By combining structured marker-based LLM annotation, Cell Ontology mapping, validation, and reproducible exports, the framework supports practical and publication-ready annotation workflows. Benchmark results across PBMC, pancreas, brain, and lung datasets show that DeepSeekCell can provide explainable annotation, ontology standardization, competitive accuracy, high computational efficiency, and an interactive Shiny platform for next-generation scRNA-seq annotation.
+
+\section*{List of abbreviations}
+
+ARI: adjusted Rand index; BMC: BioMed Central; CL: Cell Ontology identifier; LLM: large language model; PBMC: peripheral blood mononuclear cell; PCA: principal component analysis; scRNA-seq: single-cell RNA sequencing.
+
+\backmatter
+
+\bmhead{Supplementary information}
+
+Supplementary table captions are provided for the CSV files included with the submission package. Supplementary Table S1: full replicate-level benchmark results from \texttt{benchmark\_results\_full.csv}, including ARI, macro-F1, exact accuracy, balanced accuracy, clade accuracy, unknown rate, runtime, token usage, estimated cost, and cluster purity. Supplementary Table S2: benchmark summary statistics from \texttt{benchmark\_results\_summary.csv}. Supplementary Table S3: dataset-level preprocessing and cluster purity summaries from \texttt{dataset\_summary.csv}. Supplementary Table S4: cluster-level truth labels and cluster purity summaries from \texttt{cluster\_summary.csv}. Supplementary Table S5: compact final benchmark table from \texttt{final\_benchmark\_table.csv}. Supplementary Table S6: paired Wilcoxon signed-rank comparisons from \texttt{benchmark\_pairwise\_wilcoxon.csv}. Supplementary Table S7: Friedman omnibus tests from \texttt{benchmark\_friedman\_tests.csv}. Supplementary Table S8: DeepSeekCell label stability summaries from \texttt{benchmark\_llm\_stability.csv}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{global_ARI.pdf}
+\caption{Supplementary global benchmark overview for adjusted Rand index (ARI). Bars summarize mean ARI by dataset and method.}\label{fig:supp-global-ari}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{global_MacroF1.pdf}
+\caption{Supplementary global benchmark overview for macro-F1. Bars summarize mean macro-F1 by dataset and method.}\label{fig:supp-global-macroF1}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{global_Accuracy.pdf}
+\caption{Supplementary global benchmark overview for exact annotation accuracy. Bars summarize mean exact accuracy by dataset and method.}\label{fig:supp-global-accuracy}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{global_Runtime.pdf}
+\caption{Supplementary global benchmark overview for runtime. Bars summarize mean runtime by dataset and method.}\label{fig:supp-global-runtime}
+\end{figure}
+
+\section*{Declarations}
+
+\bmhead{Ethics approval and consent to participate}
+Not applicable. This study used public or package-distributed benchmark datasets and did not involve new human participant recruitment, new animal experiments, or new collection of human samples.
+
+\bmhead{Consent for publication}
+Not applicable.
+
+\bmhead{Availability of data and materials}
+The source code is available at \url{https://github.com/mohkone/DeepSeekCell.git}. The archived GitHub-Zenodo software record is available at \url{https://doi.org/10.5281/zenodo.20680434}, with all-version concept DOI \url{https://doi.org/10.5281/zenodo.20680433}. Benchmark scripts are provided in the \texttt{benchmarks/} directory. The final benchmark outputs used for this manuscript are generated locally in the \texttt{results/} directory, including \texttt{final\_benchmark\_table.csv}, \texttt{benchmark\_results\_full.csv}, \texttt{benchmark\_results\_summary.csv}, \texttt{dataset\_summary.csv}, \texttt{cluster\_summary.csv}, \texttt{benchmark\_pairwise\_wilcoxon.csv}, \texttt{benchmark\_friedman\_tests.csv}, \texttt{benchmark\_llm\_stability.csv}, and \texttt{benchmark\_manifest.txt}. Large external resources, including the full Cell Ontology OBO file and ScType database, should be obtained according to their upstream licenses.
+
+\bmhead{Competing interests}
+The authors declare that they have no competing interests.
+
+\bmhead{Funding}
+The authors received no specific funding for this work.
+
+\bmhead{Code availability}
+Project name: DeepSeekCell. Project home page: \url{https://github.com/mohkone/DeepSeekCell.git}. Archived software record: \url{https://doi.org/10.5281/zenodo.20680434}; all-version concept DOI: \url{https://doi.org/10.5281/zenodo.20680433}. Manuscript software version: DeepSeekCell 0.1.0, corresponding to benchmark cache version \texttt{2026-06-12-publication-v5}. Operating system: platform independent. Programming language: R. Other requirements: R 4.1 or later and the R package dependencies listed in the repository \texttt{DESCRIPTION} file. License: MIT. Restrictions for non-academic use: none beyond the software license and the licenses of external resources used by the workflow.
+
+\bmhead{Authors' contributions}
+M.K. and S.W. conceived the study, developed the DeepSeekCell software and Shiny platform, designed and interpreted the benchmark analyses, and wrote and revised the manuscript. Both authors reviewed and approved the final manuscript.
+
+\bmhead{Acknowledgements}
+The authors thank the developers and maintainers of the open-source R, Shiny, Seurat, SingleR, ScType, and Cell Ontology resources used by this project.
+
+\bmhead{Authors' information}
+Not applicable.
+
+\bibliography{deepseekcell_bmc_refs}
+
+\end{document}

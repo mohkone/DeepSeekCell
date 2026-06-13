@@ -1,0 +1,11 @@
+"MethodSet","Metric","Methods","Blocks","FriedmanChiSquared","PValue"
+"all_datasets","ARI","DeepSeek;scType;SingleR;scmap",18,23.3050847457627,3.48812412149091e-05
+"all_datasets","MacroF1","DeepSeek;scType;SingleR;scmap",18,19.2413793103448,0.000243710121734127
+"all_datasets","Accuracy","DeepSeek;scType;SingleR;scmap",18,17.4596273291925,0.00056842050476969
+"all_datasets","CladeAcc","DeepSeek;scType;SingleR;scmap",18,13.3103448275862,0.00401134587733736
+"all_datasets","RuntimeSec","DeepSeek;scType;SingleR;scmap",18,45.3333333333333,7.85999168011054e-10
+"human_datasets_with_celltypist","ARI","DeepSeek;scType;SingleR;scmap;CellTypist",12,15.8632478632479,0.00320826270410781
+"human_datasets_with_celltypist","MacroF1","DeepSeek;scType;SingleR;scmap;CellTypist",12,16.3636363636364,0.00256808976698252
+"human_datasets_with_celltypist","Accuracy","DeepSeek;scType;SingleR;scmap;CellTypist",12,13.6869565217391,0.00836418926478721
+"human_datasets_with_celltypist","CladeAcc","DeepSeek;scType;SingleR;scmap;CellTypist",12,10.6147186147186,0.0312529279844681
+"human_datasets_with_celltypist","RuntimeSec","DeepSeek;scType;SingleR;scmap;CellTypist",12,36.1333333333333,2.7165714639051e-07

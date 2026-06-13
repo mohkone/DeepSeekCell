@@ -19,6 +19,7 @@ MODELS <- list(
 DATA_DIR <- "data"
 ONTOLOGY_FILE <- file.path(DATA_DIR, "cl.obo")
 SCTYPE_DB <- "scType/ScTypeDB_full.xlsx"
+CELLTYPIST_MODEL <- Sys.getenv("CELLTYPIST_MODEL", unset = "")
 
 TOP_MARKERS <- 25
 SEURAT_RESOLUTION <- 0.5

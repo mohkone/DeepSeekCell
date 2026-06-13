@@ -5,7 +5,7 @@
 }
 
 deepseekcell_version <- function() {
-  "2.1.0"
+  "0.1.0"
 }
 
 is_blank <- function(x) {

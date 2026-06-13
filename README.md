@@ -4,6 +4,8 @@
 
 DeepSeekCell annotates single-cell RNA-seq clusters from marker genes using an LLM-assisted, ontology-aware workflow. It returns standardized cell type labels, confidence scores, marker-based reasoning, Cell Ontology mappings, validation summaries, and exportable reports through both R functions and an interactive Shiny interface.
 
+Current software version: `0.1.0`.
+
 ## Core Features
 
 - LLM annotation from per-cluster marker genes using DeepSeek or local Ollama.
@@ -11,7 +13,7 @@ DeepSeekCell annotates single-cell RNA-seq clusters from marker genes using an L
 - Explainability fields for marker-based reasoning, tissue consistency, possible doublets, and possible contamination.
 - Offline validation metrics, quality score, ontology coverage, and missing-cluster checks.
 - Shiny application for interactive annotation and report download.
-- Benchmark scripts for replicated comparisons against SingleR and scType.
+- Benchmark scripts for replicated comparisons against SingleR, scType, scmap, and CellTypist.
 
 ## Installation
 
@@ -27,7 +29,15 @@ Optional benchmarking dependencies:
 
 ```r
 install.packages(c("Seurat", "mclust", "testthat", "yaml"))
-BiocManager::install(c("SingleR", "celldex", "SingleCellExperiment", "scRNAseq"))
+BiocManager::install(c("SingleR", "celldex", "SingleCellExperiment", "scRNAseq", "scmap"))
+install.packages("reticulate")
+```
+
+CellTypist is a Python dependency. Install it into the Python environment used by
+`reticulate`:
+
+```bash
+pip install celltypist anndata numpy
 ```
 
 ## API Configuration
@@ -91,9 +101,44 @@ The app accepts marker genes for up to five clusters, calls the selected model, 
 
 Benchmark scripts live in `benchmarks/`. They run a closed-label,
 marker-guided cluster annotation benchmark comparing DeepSeekCell with
-SingleR and scType on curated PBMC, pancreas, brain, and lung datasets.
+SingleR, scType, scmap, and an exploratory CellTypist baseline on curated PBMC,
+pancreas, brain, and lung datasets. DeepSeekCell is intended for cluster marker
+lists rather than raw expression matrices, so the benchmark evaluates marker
+driven annotation. Optional baselines are included only when their dependencies
+are available; otherwise they are skipped with an explanatory message.
+
+CellTypist uses tissue-aware pretrained models by default: `Immune_All_Low.pkl`
+for PBMC, `Adult_Human_PancreaticIslet.pkl` for pancreas, and
+`Human_Lung_Atlas.pkl` for lung. Set `CELLTYPIST_MODEL` to override this
+automatic choice. In this benchmark, CellTypist is run on cluster-average
+pseudo-profiles and should be interpreted as an exploratory comparison rather
+than its native cell-level workflow.
 Set `DEEPSEEK_API_KEY` to include DeepSeekCell; otherwise only non-LLM
 baselines that do not require an API key will run.
+
+The benchmark also writes exploratory statistical summaries:
+`benchmark_pairwise_wilcoxon.csv`, `benchmark_friedman_tests.csv`, and
+`benchmark_llm_stability.csv`.
+
+## Archiving
+
+The GitHub-Zenodo software archive is available at
+https://doi.org/10.5281/zenodo.20680434. The all-version Zenodo concept DOI is
+https://doi.org/10.5281/zenodo.20680433. The repository includes `.zenodo.json`
+metadata so future Zenodo records are populated consistently.
+
+If `reticulate::py_config()` reports a missing Python from `RETICULATE_PYTHON`,
+restart R and point reticulate to a valid environment before sourcing the
+benchmark:
+
+```r
+Sys.setenv(
+  RETICULATE_PYTHON =
+    "C:/Users/Mohamed KONE/Documents/.virtualenvs/deepseek_env/Scripts/python.exe"
+)
+reticulate::py_config()
+reticulate::py_module_available("celltypist")
+```
 
 ```r
 source("benchmarks/run_benchmark.R")

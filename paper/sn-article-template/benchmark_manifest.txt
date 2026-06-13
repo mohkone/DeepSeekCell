@@ -1,0 +1,80 @@
+DeepSeekCell benchmark manifest
+================================
+Generated: 2026-06-13 20:10:07 CST
+Benchmark mode: closed-label-marker-guided
+Replicates requested: 3
+Methods: DeepSeek, scType, SingleR, scmap, CellTypist
+Top markers per cluster: 25
+Seurat resolution: 0.5
+PCA dimensions configured: 50
+Cache version: 2026-06-12-publication-v5
+
+Interpretation notes:
+- DeepSeekCell is evaluated as a closed-label, marker-guided annotation workflow.
+- SingleR, scType, scmap, and CellTypist are evaluated as baseline methods when their dependencies are available.
+- scmap is run with scmapCell nearest-neighbor label transfer before cluster-level majority voting.
+- CellTypist is evaluated on cluster-average pseudo-profiles using tissue-aware pretrained models unless CELLTYPIST_MODEL overrides the model choice.
+- Pairwise Wilcoxon and Friedman test outputs are exploratory because replicate blocks are small and some datasets are deterministic.
+- LLM stability is summarized for fixed cluster structures using per-cluster debug prediction files.
+- Results summarize cluster-level labels after explicit label harmonization.
+- Clade accuracy uses the package Cell Ontology mapper and lineage relation checks.
+- Treat datasets with low cluster purity as lower-confidence benchmark evidence.
+
+Dataset summaries:
+   Replicate Seed        Dataset   Tissue Species NCells NGenes
+1          1  100           PBMC     PBMC   Human   2700  13714
+2          1  100  BaronPancreas Pancreas   Human   8569  20125
+3          1  100 MuraroPancreas Pancreas   Human   2122  19059
+4          1  100     TasicBrain    Brain   Mouse   1809  24058
+5          1  100    ZeiselBrain    Brain   Mouse   3005  20006
+6          1  100   ZilionisLung     Lung   Human   5000  41861
+7          2  200           PBMC     PBMC   Human   2700  13714
+8          2  200  BaronPancreas Pancreas   Human   8569  20125
+9          2  200 MuraroPancreas Pancreas   Human   2122  19059
+10         2  200     TasicBrain    Brain   Mouse   1809  24058
+11         2  200    ZeiselBrain    Brain   Mouse   3005  20006
+12         2  200   ZilionisLung     Lung   Human   5000  41861
+13         3  300           PBMC     PBMC   Human   2700  13714
+14         3  300  BaronPancreas Pancreas   Human   8569  20125
+15         3  300 MuraroPancreas Pancreas   Human   2122  19059
+16         3  300     TasicBrain    Brain   Mouse   1809  24058
+17         3  300    ZeiselBrain    Brain   Mouse   3005  20006
+18         3  300   ZilionisLung     Lung   Human   5000  41861
+   NClusters MeanClusterPurity MedianClusterPurity
+1          8         0.9412308           0.9578943
+2         16         0.9515475           0.9883066
+3         11         0.9536604           0.9473684
+4         15         0.9287417           0.9714286
+5         16         0.7734792           0.7395833
+6         17         0.9339140           0.9769585
+7          8         0.9412308           0.9578943
+8         16         0.9515475           0.9883066
+9         11         0.9536604           0.9473684
+10        15         0.9287417           0.9714286
+11        16         0.7734792           0.7395833
+12        16         0.8984500           0.9648953
+13         8         0.9412308           0.9578943
+14        16         0.9515475           0.9883066
+15        11         0.9536604           0.9473684
+16        15         0.9287417           0.9714286
+17        16         0.7734792           0.7395833
+18        18         0.8974010           0.9749490
+   MinClusterPurity TopMarkers SeuratResolution NPCs
+1         0.8438538         25              0.5   50
+2         0.5339806         25              0.5   50
+3         0.8923077         25              0.5   50
+4         0.6923077         25              0.5   50
+5         0.5040984         25              0.5   50
+6         0.6595745         25              0.5   50
+7         0.8438538         25              0.5   50
+8         0.5339806         25              0.5   50
+9         0.8923077         25              0.5   50
+10        0.6923077         25              0.5   50
+11        0.5040984         25              0.5   50
+12        0.4062500         25              0.5   50
+13        0.8438538         25              0.5   50
+14        0.5339806         25              0.5   50
+15        0.8923077         25              0.5   50
+16        0.6923077         25              0.5   50
+17        0.5040984         25              0.5   50
+18        0.4466667         25              0.5   50

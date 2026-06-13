@@ -1,0 +1,6 @@
+"Method","StabilityScope","Dataset","ComparableClusters","MeanReplicates","RawStabilityRate","HarmonisedStabilityRate"
+"DeepSeek","fixed cluster structures only","BaronPancreas",16,3,1,1
+"DeepSeek","fixed cluster structures only","MuraroPancreas",11,3,1,1
+"DeepSeek","fixed cluster structures only","PBMC",8,3,1,1
+"DeepSeek","fixed cluster structures only","TasicBrain",15,3,1,1
+"DeepSeek","fixed cluster structures only","ZeiselBrain",16,3,1,1

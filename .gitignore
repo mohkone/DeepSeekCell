@@ -26,6 +26,8 @@ benchmark_results.csv
 benchmark_plot.pdf
 benchmark_*.pdf
 benchmark_*.csv
+!paper/sn-article-template/benchmark_*.pdf
+!paper/sn-article-template/benchmark_*.csv
 Figure*_*.tiff
 global_benchmark_comparison.*
 unmatched_celltypes.log
