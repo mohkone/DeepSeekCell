@@ -101,24 +101,67 @@ The app accepts marker genes for up to five clusters, calls the selected model, 
 
 Benchmark scripts live in `benchmarks/`. They run a closed-label,
 marker-guided cluster annotation benchmark comparing DeepSeekCell with
-SingleR, scType, scmap, and an exploratory CellTypist baseline on curated PBMC,
-pancreas, brain, and lung datasets. DeepSeekCell is intended for cluster marker
-lists rather than raw expression matrices, so the benchmark evaluates marker
-driven annotation. Optional baselines are included only when their dependencies
-are available; otherwise they are skipped with an explanatory message.
+SingleR, scType, scmap, and CellTypist on curated PBMC, pancreas, brain, and
+lung datasets. DeepSeekCell is intended for cluster marker lists rather than raw
+expression matrices, so the benchmark evaluates marker-driven annotation.
+Optional baselines are included only when their dependencies are available;
+otherwise they are skipped with an explanatory message.
 
 CellTypist uses tissue-aware pretrained models by default: `Immune_All_Low.pkl`
 for PBMC, `Adult_Human_PancreaticIslet.pkl` for pancreas, and
 `Human_Lung_Atlas.pkl` for lung. Set `CELLTYPIST_MODEL` to override this
-automatic choice. In this benchmark, CellTypist is run on cluster-average
-pseudo-profiles and should be interpreted as an exploratory comparison rather
-than its native cell-level workflow.
+automatic choice. CellTypist is evaluated in its native cell-level workflow
+where compatible human models are available; cluster-level labels are derived
+by majority vote only as a secondary harmonized comparison.
 Set `DEEPSEEK_API_KEY` to include DeepSeekCell; otherwise only non-LLM
 baselines that do not require an API key will run.
 
-The benchmark also writes exploratory statistical summaries:
-`benchmark_pairwise_wilcoxon.csv`, `benchmark_friedman_tests.csv`, and
+The benchmark also writes ablation, calibration, selector-efficiency, stability,
+and exploratory statistical summaries including `benchmark_pairwise_wilcoxon.csv`,
+`benchmark_friedman_tests.csv`, `ablation_confidence_quality.csv`,
+`ablation_refinement_behavior.csv`, `refinement_efficiency_summary.csv`, and
 `benchmark_llm_stability.csv`.
+
+### Fresh-clone benchmark workflow
+
+From a fresh clone, install the R and optional Python dependencies, then obtain
+the external resources used by the benchmark:
+
+- Cell Ontology OBO file at `data/cl.obo`.
+- ScType database at `scType/ScTypeDB_full.xlsx`.
+- Optional CellTypist Python environment configured through `RETICULATE_PYTHON`.
+
+Run the reproducibility smoke tests first:
+
+```r
+devtools::test()
+```
+
+For a full benchmark with new LLM calls:
+
+```r
+Sys.setenv(
+  DEEPSEEK_API_KEY = "...",
+  DEEPSEEKCELL_USE_LLM_CACHE = "true"
+)
+source("benchmarks/run_benchmark.R")
+main(n_replicates = 3)
+```
+
+`DEEPSEEKCELL_USE_LLM_CACHE=true` means that existing cached first-pass and
+refinement responses in `results/benchmark_debug/` are reused, and missing cache
+entries are generated and saved. To reproduce a benchmark without additional
+API calls, restore `results/benchmark_debug/` from a previous run or submission
+package before executing the command above. The paired ablation design requires
+that all DeepSeekCell arms reuse the same cached first-pass response hash within
+each dataset and replicate.
+
+For local LLM pilot checks with Ollama, start the Ollama server and run:
+
+```bash
+Rscript benchmarks/run_ollama_multimodel_pilot.R ZilionisLung 1
+Rscript benchmarks/summarise_ollama_multimodel_pilots.R
+```
 
 ## Archiving
 
@@ -155,6 +198,7 @@ Key outputs include `results/benchmark_results_summary.csv`,
 - Do not commit API keys, `.Renviron`, `.RData`, benchmark caches, or generated figures.
 - Prefer the full Cell Ontology OBO file at `data/cl.obo`; a small fallback ontology is provided only for offline smoke tests and graceful failure.
 - Result metadata includes model name, model ID, token usage, runtime, ontology fallback status, and schema version.
+- Published manuscript figures and summary tables are committed under `paper/` for audit, while newly generated `results/` files remain ignored by default.
 
 ## Citation
 

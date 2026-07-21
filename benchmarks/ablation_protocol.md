@@ -11,6 +11,29 @@ for every DeepSeekCell ablation arm.
 
 Do not call the first-pass LLM independently for each arm.
 
+## Fresh-clone reproduction checklist
+
+1. Clone the repository and install the R dependencies listed in `README.md`.
+2. Add external benchmark resources that are not committed to Git:
+   `data/cl.obo` and `scType/ScTypeDB_full.xlsx`.
+3. Configure optional CellTypist through `RETICULATE_PYTHON` if native
+   CellTypist metrics are required.
+4. Restore `results/benchmark_debug/` from a previous benchmark run or
+   submission package when reproducing from cached LLM outputs.
+5. Set `DEEPSEEKCELL_USE_LLM_CACHE=true`. Existing first-pass and refinement
+   cache entries will be reused; missing entries will be generated and saved
+   if the relevant LLM backend is available.
+6. Run:
+
+```r
+source("benchmarks/run_benchmark.R")
+main(n_replicates = 3)
+```
+
+The confirmatory benchmark should be treated as paired only when the result
+manifest records one shared first-pass response hash per dataset and replicate
+across the DeepSeekCell ablation arms.
+
 ## Ablation arms
 
 | Arm | First-pass LLM | Evidence score | Confidence replacement | Second LLM call |
