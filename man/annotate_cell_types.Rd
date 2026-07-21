@@ -14,6 +14,8 @@ annotate_cell_types(
   validate = TRUE,
   max_genes_per_cluster = 30,
   ontology_path = NULL,
+  calibrate_confidence = TRUE,
+  self_refine = FALSE,
   return_prompt = FALSE
 )
 }
@@ -35,6 +37,12 @@ annotate_cell_types(
 \item{max_genes_per_cluster}{Maximum marker genes to include per cluster.}
 
 \item{ontology_path}{Optional path to a Cell Ontology OBO file.}
+
+\item{calibrate_confidence}{Whether to replace raw LLM confidence with
+ontology- and marker-calibrated confidence while preserving LLMConfidence.}
+
+\item{self_refine}{Whether to run an ontology-guided refinement call for
+clusters with conflicting marker and first-pass annotation evidence.}
 
 \item{return_prompt}{Whether to include the submitted prompt in the result.}
 }

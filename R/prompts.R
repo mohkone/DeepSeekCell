@@ -54,8 +54,9 @@ Important rules:
 5. Use standardized, publication-ready cell type names.
 6. Prefer the most specific biologically justified label.
 7. If markers indicate more than one cell type, set is_mixed = true and describe the mixture.
-8. Confidence must be numeric between 0 and 1.
-9. Return only valid JSON. Do not include markdown fences or extra text.
+8. Return up to three candidate_cell_types ordered from most to least likely.
+9. Confidence must be numeric between 0 and 1.
+10. Return only valid JSON. Do not include markdown fences or extra text.
 
 Tissue prior:
 %s
@@ -70,6 +71,7 @@ Required JSON schema:
       "cluster": "Cluster1",
       "cell_type": "T cell",
       "confidence": 0.95,
+      "candidate_cell_types": ["T cell", "NK cell"],
       "is_mixed": false,
       "primary_cell_type": "T cell",
       "secondary_cell_type": "",

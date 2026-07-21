@@ -28,6 +28,7 @@ benchmark_*.pdf
 benchmark_*.csv
 !paper/sn-article-template/benchmark_*.pdf
 !paper/sn-article-template/benchmark_*.csv
+!paper/oup-authoring-template/oup-authoring-template/Fig/benchmark_*.pdf
 Figure*_*.tiff
 global_benchmark_comparison.*
 unmatched_celltypes.log
@@ -42,4 +43,5 @@ results/
 # Temporary files
 *.tmp
 *.log
+tmp/
 .positai

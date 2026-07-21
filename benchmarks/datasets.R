@@ -633,18 +633,36 @@ cache_dataset <- function(name, seed, loader) {
 }
 
 
-load_benchmark_datasets <- function(seed = 100) {
+benchmark_dataset_loaders <- function(seed = 100) {
   list(
-    PBMC = cache_dataset("PBMC", seed, function() get_pbmc_data(seed)),
+    PBMC = function() cache_dataset("PBMC", seed, function() get_pbmc_data(seed)),
 
-    BaronPancreas = cache_dataset("BaronPancreas", seed, function() get_baron_pancreas_data(seed)),
+    BaronPancreas = function() cache_dataset("BaronPancreas", seed, function() get_baron_pancreas_data(seed)),
 
-    MuraroPancreas = cache_dataset("MuraroPancreas", seed, function() get_muraro_pancreas_data(seed)),
+    MuraroPancreas = function() cache_dataset("MuraroPancreas", seed, function() get_muraro_pancreas_data(seed)),
 
-    TasicBrain = cache_dataset("TasicBrain", seed, function() get_tasic_brain_data(seed)),
+    TasicBrain = function() cache_dataset("TasicBrain", seed, function() get_tasic_brain_data(seed)),
 
-    ZeiselBrain = cache_dataset("ZeiselBrain", seed, function() get_zeisel_brain_data(seed)),
+    ZeiselBrain = function() cache_dataset("ZeiselBrain", seed, function() get_zeisel_brain_data(seed)),
 
-    ZilionisLung = cache_dataset("ZilionisLung", seed, function() get_zilionis_lung_data(seed))
+    ZilionisLung = function() cache_dataset("ZilionisLung", seed, function() get_zilionis_lung_data(seed))
   )
+}
+
+load_benchmark_dataset <- function(dataset_name, seed = 100) {
+  loaders <- benchmark_dataset_loaders(seed)
+  if (!dataset_name %in% names(loaders)) {
+    stop(
+      "Unknown dataset '", dataset_name, "'. Available datasets: ",
+      paste(names(loaders), collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  loaders[[dataset_name]]()
+}
+
+load_benchmark_datasets <- function(seed = 100) {
+  loaders <- benchmark_dataset_loaders(seed)
+  lapply(loaders, function(loader) loader())
 }

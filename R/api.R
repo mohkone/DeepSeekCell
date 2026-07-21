@@ -297,6 +297,7 @@ parse_annotation_response <- function(response_text) {
     Cluster = character(),
     CellType = character(),
     Confidence = numeric(),
+    CandidateCellTypes = character(),
     IsMixed = logical(),
     PrimaryCellType = character(),
     SecondaryCellType = character(),
@@ -322,11 +323,18 @@ parse_annotation_response <- function(response_text) {
   
   confidence <- as_confidence(get_col(ann, "confidence", 0.5))
   is_mixed <- as_flag(get_col(ann, c("is_mixed", "ismixed", "mixed"), FALSE))
+  candidates <- get_col(
+    ann,
+    c("candidate_cell_types", "candidatecelltypes", "candidates"),
+    ""
+  )
+  candidates <- .collapse_candidate_cell_types(candidates, nrow(ann))
   
   result <- data.frame(
     Cluster = as.character(get_col(ann, "cluster", paste0("Cluster", seq_len(nrow(ann))))),
     CellType = as.character(get_col(ann, c("cell_type", "celltype"), "Unknown")),
     Confidence = confidence,
+    CandidateCellTypes = candidates,
     IsMixed = is_mixed,
     PrimaryCellType = as.character(get_col(ann, c("primary_cell_type", "primarycelltype"), "")),
     SecondaryCellType = as.character(get_col(ann, c("secondary_cell_type", "secondarycelltype"), "")),
@@ -346,6 +354,39 @@ parse_annotation_response <- function(response_text) {
   result$CellType[!nzchar(result$CellType) | is.na(result$CellType)] <- "Unknown"
   
   result
+}
+
+.collapse_candidate_cell_types <- function(candidates, n_rows) {
+  if (is.null(candidates)) {
+    return(rep("", n_rows))
+  }
+
+  if (is.data.frame(candidates)) {
+    candidates <- as.list(candidates)
+  }
+
+  if (is.list(candidates)) {
+    out <- vapply(candidates, function(x) {
+      x <- unique(trimws(as.character(unlist(x))))
+      x <- x[nzchar(x) & !is.na(x)]
+      paste(x, collapse = "; ")
+    }, character(1))
+
+    if (length(out) == n_rows) {
+      return(out)
+    }
+
+    return(rep(paste(out, collapse = "; "), n_rows))
+  }
+
+  out <- trimws(as.character(candidates))
+  out[is.na(out)] <- ""
+
+  if (length(out) == n_rows) {
+    return(out)
+  }
+
+  rep(out[1] %||% "", n_rows)
 }
 
 #' Create system prompt for annotation task
@@ -368,7 +409,7 @@ create_system_prompt <- function() {
     "8. Return only valid JSON.",
     "",
     "Required JSON fields:",
-    "cluster, cell_type, confidence, is_mixed, primary_cell_type, secondary_cell_type, tissue_consistency, reasoning.",
+    "cluster, cell_type, confidence, candidate_cell_types, is_mixed, primary_cell_type, secondary_cell_type, tissue_consistency, reasoning.",
     sep = "\n"
   )
 }
@@ -391,6 +432,7 @@ create_system_prompt <- function() {
         Cluster = trimws(matches[[1]][2]),
         CellType = trimws(matches[[1]][3]),
         Confidence = as_confidence(matches[[1]][4]),
+        CandidateCellTypes = "",
         IsMixed = FALSE,
         PrimaryCellType = trimws(matches[[1]][3]),
         SecondaryCellType = "",

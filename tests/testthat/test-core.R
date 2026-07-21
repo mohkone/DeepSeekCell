@@ -16,6 +16,18 @@ test_that("LLM JSON responses are parsed with trailing text", {
   expect_false(parsed$IsMixed)
 })
 
+test_that("LLM JSON responses preserve ranked candidate labels", {
+  response <- paste0(
+    '{"annotations":[{"cluster":"Cluster1","cell_type":"T cell","confidence":0.9,',
+    '"candidate_cell_types":["T cell","NK cell"],',
+    '"is_mixed":false,"tissue_consistency":"expected","reasoning":"CD3 markers"}]}'
+  )
+
+  parsed <- parse_annotation_response(response)
+
+  expect_equal(parsed$CandidateCellTypes, "T cell; NK cell")
+})
+
 test_that("marker input processing removes common low-value genes", {
   markers <- process_cell_data(list(Cluster1 = "CD3D, CD3E; MT-ATP6\nRPL13A CD8A"))$markers
 
@@ -164,4 +176,126 @@ test_that("validation reports quality metrics", {
   ))
   expect_equal(validation$summary$n_clusters, 2)
   expect_equal(validation$summary$ontology_coverage, 0.5)
+})
+
+test_that("confidence calibration preserves strong marker-supported annotations", {
+  annotations <- data.frame(
+    Cluster = "Cluster1",
+    CellType = "Beta cell",
+    Confidence = 0.9,
+    IsMixed = FALSE,
+    TissueConsistency = "expected",
+    CL_ID = "CL:0000169",
+    OntologyLabel = "type B pancreatic cell",
+    MatchMethod = "context_exact",
+    OntologyMatchScore = 1,
+    stringsAsFactors = FALSE
+  )
+  markers <- list(Cluster1 = c("INS", "IAPP", "MAFA", "PDX1"))
+
+  calibrated <- calibrate_annotation_confidence(annotations, markers, tissue = "Pancreas")
+
+  expect_equal(calibrated$LLMConfidence, 0.9)
+  expect_equal(calibrated$EvidenceBestCellType, "beta cell")
+  expect_false(calibrated$EvidenceConflict)
+  expect_gte(calibrated$Confidence, 0.85)
+  expect_equal(calibrated$ConfidenceMethod, "ontology_marker_calibrated")
+})
+
+test_that("evidence scoring flags marker conflicts for refinement", {
+  annotations <- data.frame(
+    Cluster = "Cluster1",
+    CellType = "Macrophage",
+    Confidence = 0.95,
+    IsMixed = FALSE,
+    TissueConsistency = "expected",
+    CL_ID = "CL:0000235",
+    OntologyLabel = "macrophage",
+    MatchMethod = "exact",
+    OntologyMatchScore = 1,
+    Reasoning = "first-pass label",
+    stringsAsFactors = FALSE
+  )
+  markers <- list(Cluster1 = c("INS", "IAPP", "MAFA", "PDX1"))
+
+  scored <- score_annotation_evidence(annotations, markers, tissue = "Pancreas")
+  prompt <- create_refinement_prompt(
+    markers,
+    cbind(annotations, scored[setdiff(names(scored), "Cluster")]),
+    tissue = "Pancreas"
+  )
+
+  expect_equal(scored$EvidenceBestCellType, "beta cell")
+  expect_true(scored$EvidenceConflict)
+  expect_true(scored$RequiresRefinement)
+  expect_match(prompt, "ontology-guided self-refinement", ignore.case = TRUE)
+  expect_match(prompt, "INS", fixed = TRUE)
+})
+
+test_that("ontology-disabled evidence removes ontology-only conflict triggers", {
+  annotations <- data.frame(
+    Cluster = "Cluster1",
+    CellType = "Beta cell",
+    Confidence = 0.9,
+    IsMixed = FALSE,
+    TissueConsistency = "expected",
+    CL_ID = "CL:low_quality_match",
+    OntologyLabel = "poor ontology match",
+    MatchMethod = "fuzzy",
+    OntologyMatchScore = 0.1,
+    stringsAsFactors = FALSE
+  )
+  markers <- list(Cluster1 = c("INS", "IAPP", "MAFA", "PDX1"))
+
+  with_ontology <- score_annotation_evidence(
+    annotations,
+    markers,
+    tissue = "Pancreas",
+    use_ontology_evidence = TRUE
+  )
+  without_ontology <- score_annotation_evidence(
+    annotations,
+    markers,
+    tissue = "Pancreas",
+    use_ontology_evidence = FALSE
+  )
+
+  expect_true(with_ontology$EvidenceConflict)
+  expect_true(with_ontology$RequiresRefinement)
+  expect_equal(without_ontology$OntologyEvidenceScore, 0.5)
+  expect_false(without_ontology$EvidenceConflict)
+  expect_false(without_ontology$RequiresRefinement)
+})
+
+test_that("refinement provenance distinguishes reviewed rows from label changes", {
+  first_pass <- data.frame(
+    Cluster = c("Cluster1", "Cluster2"),
+    CellType = c("Macrophage", "Beta cell"),
+    Confidence = c(0.95, 0.88),
+    stringsAsFactors = FALSE
+  )
+  refined <- data.frame(
+    Cluster = c("Cluster1", "Cluster2"),
+    CellType = c("Beta cell", "Beta cell"),
+    Confidence = c(0.93, 0.90),
+    stringsAsFactors = FALSE
+  )
+
+  summary <- .summarise_refinement_changes(first_pass, refined)
+  final <- .add_refinement_provenance(
+    annotations = refined,
+    first_pass_annotations = first_pass,
+    flagged_clusters = c("Cluster1", "Cluster2"),
+    refined_clusters = c("Cluster1", "Cluster2"),
+    label_changed_clusters = summary$label_changed_clusters,
+    confidence_changed_clusters = summary$confidence_changed_clusters
+  )
+
+  expect_equal(summary$n_label_changed, 1)
+  expect_equal(summary$n_confidence_changed, 2)
+  expect_true(final$WasFlagged[1])
+  expect_true(final$WasRefined[1])
+  expect_true(final$RefinementChangedLabel[1])
+  expect_false(final$RefinementChangedLabel[2])
+  expect_equal(final$FirstPassCellType[1], "Macrophage")
 })

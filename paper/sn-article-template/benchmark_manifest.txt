@@ -1,6 +1,6 @@
 DeepSeekCell benchmark manifest
 ================================
-Generated: 2026-06-13 20:10:07 CST
+Generated: 2026-07-19 06:18:48 CST
 Benchmark mode: closed-label-marker-guided
 Replicates requested: 3
 Methods: DeepSeek, scType, SingleR, scmap, CellTypist
@@ -11,9 +11,19 @@ Cache version: 2026-06-12-publication-v5
 
 Interpretation notes:
 - DeepSeekCell is evaluated as a closed-label, marker-guided annotation workflow.
+- DeepSeek ablations are paired: one first-pass raw response is cached and reused for all DeepSeekCell ablation arms.
+- DeepSeekCell-Evidence adds deterministic evidence fields without changing labels or confidence.
+- DeepSeekCell-Calibrated changes confidence but not labels.
+- DeepSeekCell-RandomK, DeepSeekCell-ConfidenceK, DeepSeekCell-SelfRefined, and DeepSeekCell-FullRefined are allowed to change labels through second-pass refinement.
+- RandomK and ConfidenceK use the same per-dataset refinement budget as the evidence-conflict selector; FullRefined refines every cluster as an upper-bound control.
+- Refinement behavior metrics report both selector quality and label-change benefit/harm, including wrong-to-correct and correct-to-wrong transitions.
+- Refinement efficiency is reported as wrong-to-correct revisions per refined cluster; recovery fraction is reported relative to FullRefined wrong-to-correct revisions.
+- Selector-pairwise Wilcoxon tests compare Evidence-k with Random-k and Confidence-k across paired dataset-replicate blocks.
+- Although the benchmark uses DeepSeek, the evidence-guided selector operates on structured annotation outputs and deterministic biological evidence, so it is model-agnostic.
+- Confidence quality uses binary correctness negative log-likelihood, Brier score, ECE, AUROC, and risk-coverage analysis for selected-label correctness.
 - SingleR, scType, scmap, and CellTypist are evaluated as baseline methods when their dependencies are available.
 - scmap is run with scmapCell nearest-neighbor label transfer before cluster-level majority voting.
-- CellTypist is evaluated on cluster-average pseudo-profiles using tissue-aware pretrained models unless CELLTYPIST_MODEL overrides the model choice.
+- CellTypist is run in its native cell-level setting using tissue-aware pretrained models unless CELLTYPIST_MODEL overrides the model choice; native cell-level metrics are retained, and cluster-level majority voting is used only for the shared cluster-label comparison.
 - Pairwise Wilcoxon and Friedman test outputs are exploratory because replicate blocks are small and some datasets are deterministic.
 - LLM stability is summarized for fixed cluster structures using per-cluster debug prediction files.
 - Results summarize cluster-level labels after explicit label harmonization.

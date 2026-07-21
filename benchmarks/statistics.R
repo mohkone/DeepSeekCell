@@ -1,11 +1,12 @@
 # Statistical summaries for benchmark outputs.
 
 benchmark_pairwise_wilcoxon <- function(full,
-                                        reference_method = "DeepSeek",
+                                        reference_method = "DeepSeekCell-SelfRefined",
                                         metrics = c("ARI", "MacroF1", "Accuracy", "CladeAcc", "RuntimeSec")) {
   stopifnot(all(c("Dataset", "Replicate", "Method") %in% names(full)))
 
-  methods <- setdiff(sort(unique(full$Method)), reference_method)
+  non_label_ablation_arms <- c("DeepSeekCell-Evidence", "DeepSeekCell-Calibrated")
+  methods <- setdiff(sort(unique(full$Method)), c(reference_method, non_label_ablation_arms))
   rows <- list()
 
   for (metric in metrics) {
@@ -70,8 +71,22 @@ benchmark_pairwise_wilcoxon <- function(full,
 
 benchmark_friedman_tests <- function(full,
                                      metric_methods = list(
-                                       all_datasets = c("DeepSeek", "scType", "SingleR", "scmap"),
-                                       human_datasets_with_celltypist = c("DeepSeek", "scType", "SingleR", "scmap", "CellTypist")
+                                       deepseekcell_refinement_controls = c(
+                                         "DeepSeek-Plain",
+                                         "DeepSeekCell-RandomK",
+                                         "DeepSeekCell-ConfidenceK",
+                                         "DeepSeekCell-NoOntologyK",
+                                         "DeepSeekCell-SelfRefined",
+                                         "DeepSeekCell-FullRefined"
+                                       ),
+                                       all_datasets = c("DeepSeekCell-SelfRefined", "scType", "SingleR", "scmap"),
+                                       human_datasets_with_celltypist = c(
+                                         "DeepSeekCell-SelfRefined",
+                                         "scType",
+                                         "SingleR",
+                                         "scmap",
+                                         "CellTypist"
+                                       )
                                      ),
                                      metrics = c("ARI", "MacroF1", "Accuracy", "CladeAcc", "RuntimeSec")) {
   rows <- list()
@@ -121,8 +136,129 @@ benchmark_friedman_tests <- function(full,
   dplyr::bind_rows(rows)
 }
 
+benchmark_selector_pairwise <- function(refinement_behavior,
+                                        reference_method = NULL,
+                                        comparator_methods = NULL,
+                                        metrics = c(
+                                          "WrongToCorrect",
+                                          "NetCorrectionCount",
+                                          "CorrectionEfficiency",
+                                          "NetCorrectionRate",
+                                          "RecoveryFraction"
+                                        )) {
+  required_cols <- c("Dataset", "Replicate", "Method")
+  if (is.null(refinement_behavior) ||
+      nrow(refinement_behavior) == 0 ||
+      !all(required_cols %in% names(refinement_behavior))) {
+    return(data.frame())
+  }
+
+  behavior <- refinement_behavior
+  if (!"RefinementFamily" %in% names(behavior)) {
+    behavior <- behavior %>%
+      dplyr::mutate(
+        RefinementFamily = sub(
+          "-(RandomK|ConfidenceK|NoOntologyK|SelfRefined|FullRefined)$",
+          "",
+          .data$Method
+        )
+      )
+  }
+  behavior <- behavior %>%
+    dplyr::mutate(
+      NetCorrectionCount = .data$WrongToCorrect - .data$CorrectToWrong
+    )
+
+  rows <- list()
+  families <- sort(unique(behavior$RefinementFamily))
+
+  for (family in families) {
+    family_reference <- reference_method %||% paste0(family, "-SelfRefined")
+    family_comparators <- comparator_methods %||% c(
+      paste0(family, "-RandomK"),
+      paste0(family, "-ConfidenceK"),
+      paste0(family, "-NoOntologyK")
+    )
+
+    family_behavior <- behavior %>%
+      dplyr::filter(.data$RefinementFamily == family)
+
+    for (metric in metrics) {
+      if (!metric %in% names(family_behavior)) next
+
+      for (method in family_comparators) {
+        pair_df <- family_behavior %>%
+          dplyr::filter(.data$Method %in% c(family_reference, method)) %>%
+          dplyr::select(
+            Dataset,
+            Replicate,
+            Method,
+            Value = dplyr::all_of(metric)
+          ) %>%
+          tidyr::pivot_wider(names_from = Method, values_from = Value)
+
+        if (!all(c(family_reference, method) %in% names(pair_df))) next
+
+        pair_df <- pair_df %>%
+          dplyr::filter(
+            !is.na(.data[[family_reference]]),
+            !is.na(.data[[method]])
+          )
+
+        n_pairs <- nrow(pair_df)
+        deltas <- pair_df[[family_reference]] - pair_df[[method]]
+        p_value <- NA_real_
+        statistic <- NA_real_
+
+        if (n_pairs >= 2 && any(deltas != 0, na.rm = TRUE)) {
+          test <- tryCatch(
+            stats::wilcox.test(
+              pair_df[[family_reference]],
+              pair_df[[method]],
+              paired = TRUE,
+              exact = FALSE
+            ),
+            error = function(e) NULL
+          )
+
+          if (!is.null(test)) {
+            p_value <- unname(test$p.value)
+            statistic <- unname(test$statistic)
+          }
+        }
+
+        rows[[length(rows) + 1]] <- data.frame(
+          RefinementFamily = family,
+          Metric = metric,
+          ReferenceMethod = family_reference,
+          ComparatorMethod = method,
+          Blocks = n_pairs,
+          NonzeroDifferences = sum(deltas != 0, na.rm = TRUE),
+          ReferenceMean = mean(pair_df[[family_reference]], na.rm = TRUE),
+          ComparatorMean = mean(pair_df[[method]], na.rm = TRUE),
+          ReferenceTotal = sum(pair_df[[family_reference]], na.rm = TRUE),
+          ComparatorTotal = sum(pair_df[[method]], na.rm = TRUE),
+          MeanDifference = mean(deltas, na.rm = TRUE),
+          MedianDifference = stats::median(deltas, na.rm = TRUE),
+          WilcoxonStatistic = statistic,
+          PValue = p_value,
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+  }
+
+  out <- dplyr::bind_rows(rows)
+  if (nrow(out) == 0) return(out)
+
+  out %>%
+    dplyr::group_by(.data$RefinementFamily, .data$Metric) %>%
+    dplyr::mutate(PValueBH = stats::p.adjust(.data$PValue, method = "BH")) %>%
+    dplyr::ungroup()
+}
+
 benchmark_llm_stability <- function(debug_dir = file.path("results", "benchmark_debug"),
-                                    method = "DeepSeek",
+                                    method = "DeepSeekCell-SelfRefined",
                                     fixed_datasets = c(
                                       "PBMC", "BaronPancreas", "MuraroPancreas",
                                       "TasicBrain", "ZeiselBrain"
@@ -172,10 +308,12 @@ benchmark_llm_stability <- function(debug_dir = file.path("results", "benchmark_
 }
 
 run_benchmark_statistical_tests <- function(full,
+                                            refinement_behavior = NULL,
                                             debug_dir = file.path("results", "benchmark_debug")) {
   list(
     pairwise_wilcoxon = benchmark_pairwise_wilcoxon(full),
     friedman = benchmark_friedman_tests(full),
+    selector_pairwise = benchmark_selector_pairwise(refinement_behavior),
     llm_stability = benchmark_llm_stability(debug_dir = debug_dir)
   )
 }

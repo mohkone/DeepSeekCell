@@ -13,6 +13,10 @@
 #' @param validate Whether to perform validation
 #' @param max_genes_per_cluster Maximum marker genes to include per cluster.
 #' @param ontology_path Optional path to a Cell Ontology OBO file.
+#' @param calibrate_confidence Whether to replace raw LLM confidence with
+#' ontology- and marker-calibrated confidence while preserving LLMConfidence.
+#' @param self_refine Whether to run an ontology-guided refinement call for
+#' clusters with conflicting marker and first-pass annotation evidence.
 #' @param return_prompt Whether to include the submitted prompt in the result.
 #' @return Comprehensive result object
 #' @export
@@ -26,6 +30,8 @@ annotate_cell_types <- function(markers,
                                 validate = TRUE,
                                 max_genes_per_cluster = 30,
                                 ontology_path = NULL,
+                                calibrate_confidence = TRUE,
+                                self_refine = FALSE,
                                 return_prompt = FALSE) {
   start_time <- Sys.time()
   
@@ -90,21 +96,104 @@ annotate_cell_types <- function(markers,
   if (isTRUE(use_ontology)) {
     ontology_data <- load_cell_ontology(ontology_path = ontology_path)
     ontology_is_fallback <- isTRUE(ontology_data$is_fallback)
-    mappings <- do.call(
-      rbind,
-      lapply(
-        annotations$CellType,
-        map_to_cell_ontology,
-        ontology = ontology_data,
-        tissue = tissue
-      )
-    )
-    
-    annotations$CL_ID <- mappings$CL_ID
-    annotations$OntologyLabel <- mappings$OntologyLabel
-    annotations$MatchMethod <- mappings$MatchMethod
-    annotations$OntologyMatchScore <- mappings$OntologyMatchScore
+    annotations <- .add_ontology_mappings(annotations, ontology_data, tissue)
   }
+  first_pass_annotations <- annotations
+
+  refinement <- list(
+    enabled = isTRUE(self_refine),
+    attempted = FALSE,
+    success = NA,
+    n_candidates = 0,
+    n_reviewed = 0,
+    n_returned = 0,
+    n_updated = 0,
+    n_label_changed = 0,
+    n_confidence_changed = 0,
+    error = NULL
+  )
+  flagged_clusters <- character()
+  refined_clusters <- character()
+  label_changed_clusters <- character()
+  confidence_changed_clusters <- character()
+
+  preliminary_annotations <- if (isTRUE(calibrate_confidence) || isTRUE(self_refine)) {
+    calibrate_annotation_confidence(annotations, markers, tissue = tissue)
+  } else {
+    annotations
+  }
+
+  requires_refinement <- preliminary_annotations$RequiresRefinement %||%
+    rep(FALSE, nrow(preliminary_annotations))
+  requires_refinement <- as_flag(requires_refinement)
+  requires_refinement[is.na(requires_refinement)] <- FALSE
+  flagged_clusters <- preliminary_annotations$Cluster[requires_refinement]
+
+  if (isTRUE(self_refine)) {
+    refinement_candidates <- preliminary_annotations[requires_refinement, , drop = FALSE]
+    refinement$n_candidates <- nrow(refinement_candidates)
+    refinement$n_reviewed <- nrow(refinement_candidates)
+
+    if (nrow(refinement_candidates) > 0) {
+      refinement$attempted <- TRUE
+      refinement_prompt <- create_refinement_prompt(
+        markers = markers,
+        annotations = refinement_candidates,
+        tissue = tissue,
+        species = species
+      )
+      refinement_result <- call_llm_api(refinement_prompt, model_config, api_key)
+      refinement$success <- isTRUE(refinement_result$success)
+
+      if (isTRUE(refinement_result$success)) {
+        refined_annotations <- parse_annotation_response(refinement_result$content)
+        refined_annotations <- refined_annotations[
+          refined_annotations$Cluster %in% annotations$Cluster,
+          ,
+          drop = FALSE
+        ]
+
+        if (nrow(refined_annotations) > 0) {
+          change_summary <- .summarise_refinement_changes(
+            first_pass_annotations,
+            refined_annotations
+          )
+          annotations <- .replace_annotation_rows(annotations, refined_annotations)
+          if (isTRUE(use_ontology)) {
+            annotations <- .add_ontology_mappings(annotations, ontology_data, tissue)
+          }
+          refined_clusters <- refined_annotations$Cluster
+          label_changed_clusters <- change_summary$label_changed_clusters
+          confidence_changed_clusters <- change_summary$confidence_changed_clusters
+          refinement$n_returned <- nrow(refined_annotations)
+          refinement$n_updated <- change_summary$n_label_changed
+          refinement$n_label_changed <- change_summary$n_label_changed
+          refinement$n_confidence_changed <- change_summary$n_confidence_changed
+          refinement$label_changed_clusters <- label_changed_clusters
+          refinement$confidence_changed_clusters <- confidence_changed_clusters
+          refinement$usage <- refinement_result$usage
+          refinement$latency_sec <- refinement_result$latency_sec
+          if (isTRUE(return_prompt)) {
+            refinement$prompt <- refinement_prompt
+          }
+        }
+      } else {
+        refinement$error <- refinement_result$error %||% "Refinement call failed."
+      }
+    }
+  }
+
+  if (isTRUE(calibrate_confidence)) {
+    annotations <- calibrate_annotation_confidence(annotations, markers, tissue = tissue)
+  }
+  annotations <- .add_refinement_provenance(
+    annotations = annotations,
+    first_pass_annotations = first_pass_annotations,
+    flagged_clusters = flagged_clusters,
+    refined_clusters = refined_clusters,
+    label_changed_clusters = label_changed_clusters,
+    confidence_changed_clusters = confidence_changed_clusters
+  )
   
   validation <- if (isTRUE(validate)) {
     validate_annotations(
@@ -117,8 +206,9 @@ annotate_cell_types <- function(markers,
   }
   
   total_time <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
-  tokens <- api_result$usage$total_tokens %||% 0
-  if (is.na(tokens)) tokens <- 0
+  first_tokens <- .safe_token_count(api_result$usage$total_tokens %||% 0)
+  refine_tokens <- .safe_token_count(refinement$usage$total_tokens %||% 0)
+  tokens <- first_tokens + refine_tokens
   cost <- (tokens / 1000) * (model_config$cost_per_1k_tokens %||% 0)
 
   result <- list(
@@ -138,10 +228,18 @@ annotate_cell_types <- function(markers,
       estimated_cost_usd = cost,
       ontology_enabled = isTRUE(use_ontology),
       ontology_is_fallback = ontology_is_fallback,
+      confidence_calibrated = isTRUE(calibrate_confidence),
+      self_refinement_enabled = isTRUE(self_refine),
+      self_refinement_attempted = isTRUE(refinement$attempted),
+      self_refinement_updates = refinement$n_updated,
+      self_refinement_reviewed = refinement$n_reviewed,
+      self_refinement_label_changes = refinement$n_label_changed,
+      self_refinement_confidence_changes = refinement$n_confidence_changed,
       schema_version = deepseekcell_version(),
       timestamp = Sys.time()
     ),
-    validation = validation
+    validation = validation,
+    refinement = refinement
   )
 
   if (isTRUE(return_prompt)) {
@@ -156,6 +254,7 @@ annotate_cell_types <- function(markers,
     Cluster = cluster_names,
     CellType = "Unknown",
     Confidence = 0.5,
+    CandidateCellTypes = "",
     IsMixed = FALSE,
     PrimaryCellType = "Unknown",
     SecondaryCellType = "",
@@ -179,4 +278,116 @@ annotate_cell_types <- function(markers,
   annotations <- annotations[match(cluster_names, annotations$Cluster), , drop = FALSE]
   rownames(annotations) <- NULL
   annotations
+}
+
+.add_ontology_mappings <- function(annotations, ontology_data, tissue) {
+  mappings <- do.call(
+    rbind,
+    lapply(
+      annotations$CellType,
+      map_to_cell_ontology,
+      ontology = ontology_data,
+      tissue = tissue
+    )
+  )
+
+  annotations$CL_ID <- mappings$CL_ID
+  annotations$OntologyLabel <- mappings$OntologyLabel
+  annotations$MatchMethod <- mappings$MatchMethod
+  annotations$OntologyMatchScore <- mappings$OntologyMatchScore
+  annotations
+}
+
+.replace_annotation_rows <- function(annotations, refined_annotations) {
+  base_cols <- c(
+    "Cluster", "CellType", "Confidence", "CandidateCellTypes", "IsMixed",
+    "PrimaryCellType", "SecondaryCellType", "TissueConsistency", "Reasoning"
+  )
+  shared_cols <- intersect(base_cols, names(refined_annotations))
+
+  for (i in seq_len(nrow(refined_annotations))) {
+    cluster <- refined_annotations$Cluster[[i]]
+    idx <- match(cluster, annotations$Cluster)
+    if (is.na(idx)) next
+
+    for (column in shared_cols) {
+      annotations[[column]][idx] <- refined_annotations[[column]][i]
+    }
+  }
+
+  annotations
+}
+
+.summarise_refinement_changes <- function(first_pass_annotations, refined_annotations) {
+  if (!is.data.frame(refined_annotations) || nrow(refined_annotations) == 0) {
+    return(list(
+      n_label_changed = 0,
+      n_confidence_changed = 0,
+      label_changed_clusters = character(),
+      confidence_changed_clusters = character()
+    ))
+  }
+
+  idx <- match(refined_annotations$Cluster, first_pass_annotations$Cluster)
+  valid <- !is.na(idx)
+  if (!any(valid)) {
+    return(list(
+      n_label_changed = 0,
+      n_confidence_changed = 0,
+      label_changed_clusters = character(),
+      confidence_changed_clusters = character()
+    ))
+  }
+
+  refined <- refined_annotations[valid, , drop = FALSE]
+  first <- first_pass_annotations[idx[valid], , drop = FALSE]
+  label_changed <- normalize_cell_type(refined$CellType) !=
+    normalize_cell_type(first$CellType)
+  confidence_changed <- abs(
+    as_confidence(refined$Confidence) - as_confidence(first$Confidence)
+  ) > 1e-6
+
+  list(
+    n_label_changed = sum(label_changed, na.rm = TRUE),
+    n_confidence_changed = sum(confidence_changed, na.rm = TRUE),
+    label_changed_clusters = refined$Cluster[label_changed],
+    confidence_changed_clusters = refined$Cluster[confidence_changed]
+  )
+}
+
+.add_refinement_provenance <- function(annotations,
+                                       first_pass_annotations,
+                                       flagged_clusters = character(),
+                                       refined_clusters = character(),
+                                       label_changed_clusters = character(),
+                                       confidence_changed_clusters = character()) {
+  idx <- match(annotations$Cluster, first_pass_annotations$Cluster)
+
+  annotations$FirstPassCellType <- first_pass_annotations$CellType[idx]
+  annotations$FirstPassConfidence <- as_confidence(first_pass_annotations$Confidence[idx])
+  annotations$WasFlagged <- annotations$Cluster %in% flagged_clusters
+  annotations$WasRefined <- annotations$Cluster %in% refined_clusters
+  annotations$RefinementChangedLabel <- annotations$Cluster %in% label_changed_clusters
+  annotations$RefinementChangedConfidence <- annotations$Cluster %in%
+    confidence_changed_clusters
+  annotations$RefinementReason <- ifelse(
+    annotations$WasRefined,
+    ifelse(
+      annotations$RefinementChangedLabel,
+      "refinement_changed_label",
+      "refinement_reviewed_retained_label"
+    ),
+    ifelse(annotations$WasFlagged, "flagged_not_refined", "")
+  )
+
+  annotations
+}
+
+.safe_token_count <- function(x) {
+  tokens <- suppressWarnings(as.numeric(x))
+  if (length(tokens) == 0 || all(is.na(tokens))) {
+    return(0)
+  }
+
+  sum(tokens[!is.na(tokens)])
 }

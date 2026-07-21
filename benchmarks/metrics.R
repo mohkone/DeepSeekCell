@@ -12,7 +12,7 @@ source_deepseekcell_core <- function() {
   r_dir <- normalizePath("R", winslash = "/", mustWork = TRUE)
   core_files <- file.path(
     r_dir,
-    c("utils.R", "ontology.R", "ontology_loader.R")
+    c("utils.R", "ontology.R", "ontology_loader.R", "refinement.R")
   )
 
   missing_files <- core_files[!file.exists(core_files)]

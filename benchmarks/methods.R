@@ -23,6 +23,14 @@ call_llm_api <- function(prompt, model_key, api_key, max_retries = 3) {
   start <- Sys.time()
   last_error <- NULL
 
+  if (is.null(model)) {
+    stop("Unknown model key: ", model_key, call. = FALSE)
+  }
+
+  if (isTRUE(model$is_ollama)) {
+    return(call_ollama_api(prompt, model, max_retries = max_retries))
+  }
+
   for (attempt in seq_len(max_retries)) {
     res <- tryCatch({
       body <- list(
@@ -94,6 +102,70 @@ call_llm_api <- function(prompt, model_key, api_key, max_retries = 3) {
   )
 }
 
+call_ollama_api <- function(prompt, model, max_retries = 3, timeout_sec = 300) {
+  start <- Sys.time()
+  last_error <- NULL
+  full_prompt <- paste(
+    "You are a bioinformatics expert. Output ONLY valid JSON. Do not include markdown or extra text.",
+    prompt,
+    sep = "\n\n"
+  )
+
+  for (attempt in seq_len(max_retries)) {
+    res <- tryCatch({
+      body <- list(
+        model = model$model_id,
+        prompt = full_prompt,
+        stream = FALSE,
+        options = list(
+          temperature = model$temperature %||% 0,
+          num_predict = model$max_tokens %||% 2000
+        )
+      )
+
+      req <- httr2::request(model$api_url) |>
+        httr2::req_timeout(timeout_sec) |>
+        httr2::req_body_json(body)
+
+      resp <- httr2::req_perform(req)
+      data <- httr2::resp_body_json(resp, simplifyVector = FALSE)
+
+      content <- data$response %||% ""
+      prompt_tokens <- data$prompt_eval_count %||% ceiling(nchar(full_prompt) / 4)
+      completion_tokens <- data$eval_count %||% ceiling(nchar(content) / 4)
+      total_tokens <- prompt_tokens + completion_tokens
+      elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
+
+      list(
+        success = TRUE,
+        content = content,
+        usage = list(
+          prompt_tokens = prompt_tokens,
+          completion_tokens = completion_tokens,
+          total_tokens = total_tokens
+        ),
+        runtime_sec = elapsed,
+        cost_usd = 0
+      )
+    }, error = function(e) {
+      last_error <<- conditionMessage(e)
+      NULL
+    })
+
+    if (!is.null(res)) return(res)
+    if (attempt < max_retries) Sys.sleep(min(2^attempt, 10))
+  }
+
+  list(
+    success = FALSE,
+    content = NULL,
+    error = last_error %||% "Unknown Ollama error",
+    usage = list(prompt_tokens = 0, completion_tokens = 0, total_tokens = 0),
+    runtime_sec = as.numeric(difftime(Sys.time(), start, units = "secs")),
+    cost_usd = 0
+  )
+}
+
 parse_llm_response <- function(response_text) {
   if (is.null(response_text) || !nzchar(trimws(response_text))) return(NULL)
 
@@ -128,6 +200,13 @@ parse_llm_response <- function(response_text) {
   }
 
   NULL
+}
+
+normalise_llm_cluster_id <- function(x) {
+  x <- tolower(trimws(as.character(x)))
+  x <- gsub("^cluster[[:space:]_:-]*", "", x, perl = TRUE)
+  x <- gsub("[[:space:]]+", "", x, perl = TRUE)
+  x
 }
 
 run_llm_annotation <- function(markers_list,
@@ -225,7 +304,11 @@ run_llm_annotation <- function(markers_list,
       "Marker genes per cluster:\n",
       "%s\n\n",
       "Required JSON format:\n",
-      "{\"annotations\":[{\"cluster\":\"0\",\"cell_type\":\"Naive T cell\"}]}"
+      "{\"annotations\":[{\"cluster\":\"0\",\"cell_type\":\"Naive T cell\",",
+      "\"confidence\":0.95,\"candidate_cell_types\":[\"Naive T cell\",\"Cytotoxic T cell\"],",
+      "\"is_mixed\":false,\"primary_cell_type\":\"Naive T cell\",",
+      "\"secondary_cell_type\":\"\",\"tissue_consistency\":\"expected\",",
+      "\"reasoning\":\"CD3D, CD3E, IL7R, and CCR7 support a naive T cell identity\"}]}"
     ),
     species,
     tissue,
@@ -267,14 +350,29 @@ run_llm_annotation <- function(markers_list,
     ))
   }
 
-  pred_dict <- parse_llm_response(api_res$content)
+  pred_dict <- NULL
+  if (exists("parse_ablation_annotation_response", mode = "function")) {
+    parsed_annotations <- parse_ablation_annotation_response(api_res$content)
+    if (is.data.frame(parsed_annotations) && nrow(parsed_annotations) > 0) {
+      pred_dict <- stats::setNames(
+        as.character(parsed_annotations$CellType),
+        as.character(parsed_annotations$Cluster)
+      )
+    }
+  }
+  if (is.null(pred_dict)) {
+    pred_dict <- parse_llm_response(api_res$content)
+  }
 
   if (is.null(pred_dict)) {
     warning("Could not parse LLM response for ", dataset_name)
     pred <- setNames(rep("Unknown", length(markers_list)), names(markers_list))
   } else {
+    pred_names <- names(pred_dict)
+    pred_name_norm <- normalise_llm_cluster_id(pred_names)
     pred <- sapply(names(markers_list), function(cl) {
-      p <- pred_dict[[cl]]
+      idx <- match(normalise_llm_cluster_id(cl), pred_name_norm)
+      p <- if (is.na(idx)) NULL else pred_dict[[idx]]
       if (is.null(p) || !nzchar(p)) "Unknown" else p
     })
   }
@@ -283,7 +381,11 @@ run_llm_annotation <- function(markers_list,
     predictions = pred,
     runtime_sec = api_res$runtime_sec,
     cost_usd = api_res$cost_usd,
-    tokens = api_res$usage$total_tokens %||% NA_real_
+    tokens = api_res$usage$total_tokens %||% NA_real_,
+    prompt_tokens = api_res$usage$prompt_tokens %||% NA_real_,
+    completion_tokens = api_res$usage$completion_tokens %||% NA_real_,
+    response_text = api_res$content %||% "",
+    prompt_text = prompt
   )
 }
 
@@ -622,7 +724,7 @@ cluster_average_expression <- function(seu) {
   avg
 }
 
-parse_celltypist_labels <- function(predicted_labels, cluster_names) {
+parse_celltypist_labels <- function(predicted_labels, sample_names) {
   labels <- reticulate::py_to_r(predicted_labels)
 
   if (is.data.frame(labels)) {
@@ -635,13 +737,13 @@ parse_celltypist_labels <- function(predicted_labels, cluster_names) {
   }
 
   labels <- as.character(labels)
-  if (length(labels) != length(cluster_names)) {
+  if (length(labels) != length(sample_names)) {
     stop("CellTypist returned ", length(labels), " labels for ",
-         length(cluster_names), " cluster profiles.", call. = FALSE)
+         length(sample_names), " cell profiles.", call. = FALSE)
   }
 
   labels[is.na(labels) | labels == ""] <- "Unknown"
-  stats::setNames(labels, cluster_names)
+  stats::setNames(labels, sample_names)
 }
 
 get_celltypist_model <- function(tissue, dataset_name = NULL) {
@@ -682,16 +784,27 @@ run_celltypist <- function(seu, tissue, species = "Human", dataset_name = NULL) 
     stop("CellTypist is enabled only for human datasets in this benchmark.", call. = FALSE)
   }
 
-  avg <- cluster_average_expression(seu)
-  cluster_names <- rownames(avg)
+  if (!requireNamespace("Matrix", quietly = TRUE)) {
+    stop("Matrix is required for native CellTypist evaluation.", call. = FALSE)
+  }
+
+  expr <- get_expression_matrix_safe(seu)
+  if (!inherits(expr, "sparseMatrix")) {
+    expr <- Matrix::Matrix(expr, sparse = TRUE)
+  }
+
+  cell_names <- colnames(expr)
+  gene_names <- rownames(expr)
 
   celltypist <- reticulate::import("celltypist", convert = FALSE)
   anndata <- reticulate::import("anndata", convert = FALSE)
-  np <- reticulate::import("numpy", convert = FALSE)
 
-  adata <- anndata$AnnData(X = np$array(avg, dtype = "float32"))
-  adata$obs_names <- cluster_names
-  adata$var_names <- colnames(avg)
+  x_py <- reticulate::r_to_py(t(expr), convert = FALSE)
+  x_py <- x_py$astype("float32")
+
+  adata <- anndata$AnnData(X = x_py)
+  adata$obs_names <- cell_names
+  adata$var_names <- gene_names
 
   model_arg <- get_celltypist_model(tissue, dataset_name)
   message("CellTypist model: ", model_arg)
@@ -702,10 +815,14 @@ run_celltypist <- function(seu, tissue, species = "Human", dataset_name = NULL) 
     stop("CellTypist failed for ", tissue, ": ", e$message, call. = FALSE)
   })
 
-  pred <- parse_celltypist_labels(annotation$predicted_labels, cluster_names)
+  pred <- parse_celltypist_labels(annotation$predicted_labels, cell_names)
 
   list(
     predictions = pred,
+    prediction_level = "cell",
+    model = model_arg,
+    n_cells = length(cell_names),
+    n_genes = length(gene_names),
     runtime_sec = as.numeric(difftime(Sys.time(), start, units = "secs")),
     cost_usd = 0,
     tokens = NA_real_
