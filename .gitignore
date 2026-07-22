@@ -22,6 +22,7 @@ scType/ScTypeDB_full.xlsx
 .DS_Store
 
 # Output files
+/paper/
 benchmark_results.csv
 benchmark_plot.pdf
 benchmark_*.pdf
