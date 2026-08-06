@@ -1,6 +1,6 @@
 # R/refinement.R
-# Deterministic evidence scoring, confidence calibration, and self-refinement
-# prompts for ontology-guided annotation.
+# Deterministic evidence scoring, confidence adjustment, and fixed-budget
+# selective refinement for LLM-based cell annotation.
 
 MARKER_EVIDENCE_PROFILES <- list(
   generic = list(
@@ -149,6 +149,10 @@ score_annotation_evidence <- function(annotations,
       BestMarkerEvidenceScore = marker_match$best_score,
       TissueEvidenceScore = tissue_score,
       ConsensusEvidenceScore = consensus_score,
+      EvidenceConflictScore = round(
+        pmax(marker_match$best_score - marker_match$predicted_score, 0),
+        3
+      ),
       EvidenceBestCellType = marker_match$best_cell_type,
       EvidenceMatchedMarkers = paste(marker_match$best_markers, collapse = ", "),
       EvidenceConflict = isTRUE(conflict),
@@ -162,17 +166,17 @@ score_annotation_evidence <- function(annotations,
   do.call(rbind, rows)
 }
 
-#' Attach calibrated confidence and evidence columns to annotations
+#' Attach evidence-adjusted confidence and evidence columns to annotations
 #'
 #' The original model confidence is retained as `LLMConfidence`, while
-#' `Confidence` is replaced by a deterministic calibrated confidence.
+#' `Confidence` is replaced by a deterministic evidence-adjusted confidence.
 #'
 #' @param annotations Annotation data frame.
 #' @param markers Named marker list used for annotation.
 #' @param tissue Tissue context.
 #' @param use_ontology_evidence Whether ontology evidence contributes to the
 #' composite confidence and conflict-detection fields.
-#' @return Annotation data frame with evidence and calibrated confidence.
+#' @return Annotation data frame with evidence and evidence-adjusted confidence.
 #' @export
 calibrate_annotation_confidence <- function(annotations,
                                            markers,
@@ -208,7 +212,152 @@ calibrate_annotation_confidence <- function(annotations,
   annotations
 }
 
-#' Create an ontology-guided self-refinement prompt
+#' Select clusters for fixed-budget refinement
+#'
+#' Selects which first-pass annotations should receive an optional second LLM
+#' pass. Evidence-k ranks clusters by deterministic marker/evidence conflict,
+#' Confidence-k ranks by low raw LLM confidence, Random-k samples a matched
+#' number of clusters, and Full selects every cluster.
+#'
+#' @param annotations Annotation data frame, preferably with evidence columns
+#' produced by [calibrate_annotation_confidence()].
+#' @param markers Optional named marker list. When supplied and evidence columns
+#' are absent, evidence scores are computed before selection.
+#' @param tissue Tissue context used if evidence scores must be computed.
+#' @param budget Maximum number of clusters to select. If `NULL`, Evidence-k
+#' selects all evidence-conflicted clusters; Confidence-k and Random-k use the
+#' number of evidence-conflicted clusters as their matched budget; Full selects
+#' all clusters.
+#' @param strategy One of `"evidence"`, `"confidence"`, `"random"`, `"full"`,
+#' or `"none"`.
+#' @param use_ontology_evidence Whether ontology evidence contributes when
+#' evidence scores must be computed.
+#' @param seed Optional random seed for Random-k selection.
+#' @return Selected annotation rows with `SelectionStrategy`, `SelectionScore`
+#' and `SelectionRank` columns.
+#' @export
+select_refinement_candidates <- function(annotations,
+                                         markers = NULL,
+                                         tissue = NULL,
+                                         budget = NULL,
+                                         strategy = c(
+                                           "evidence",
+                                           "confidence",
+                                           "random",
+                                           "full",
+                                           "none"
+                                         ),
+                                         use_ontology_evidence = TRUE,
+                                         seed = NULL) {
+  strategy <- match.arg(strategy)
+
+  if (!is.data.frame(annotations) || nrow(annotations) == 0) {
+    out <- annotations[0, , drop = FALSE]
+    out$SelectionStrategy <- character()
+    out$SelectionScore <- numeric()
+    out$SelectionRank <- integer()
+    return(out)
+  }
+
+  needs_evidence <- !all(c(
+    "RequiresRefinement", "EvidenceConflictScore",
+    "BestMarkerEvidenceScore", "MarkerEvidenceScore"
+  ) %in% names(annotations))
+
+  if (isTRUE(needs_evidence) && !is.null(markers)) {
+    annotations <- calibrate_annotation_confidence(
+      annotations,
+      markers,
+      tissue = tissue,
+      use_ontology_evidence = use_ontology_evidence
+    )
+  }
+
+  empty_selection <- function() {
+    out <- annotations[0, , drop = FALSE]
+    out$SelectionStrategy <- character()
+    out$SelectionScore <- numeric()
+    out$SelectionRank <- integer()
+    out
+  }
+
+  if (identical(strategy, "none")) {
+    return(empty_selection())
+  }
+
+  evidence_flags <- as_flag(
+    annotations$RequiresRefinement %||% rep(FALSE, nrow(annotations))
+  )
+  evidence_flags[is.na(evidence_flags)] <- FALSE
+  matched_budget <- sum(evidence_flags)
+
+  if (is.null(budget)) {
+    budget <- switch(
+      strategy,
+      evidence = matched_budget,
+      confidence = matched_budget,
+      random = matched_budget,
+      full = nrow(annotations),
+      none = 0
+    )
+  }
+
+  budget <- suppressWarnings(as.integer(budget[1]))
+  if (is.na(budget) || budget <= 0) {
+    return(empty_selection())
+  }
+
+  budget <- min(budget, nrow(annotations))
+  score <- rep(NA_real_, nrow(annotations))
+
+  if (identical(strategy, "evidence")) {
+    candidate_idx <- which(evidence_flags)
+    if (length(candidate_idx) == 0) {
+      return(empty_selection())
+    }
+    score <- .evidence_conflict_score(annotations)
+    ord <- candidate_idx[order(score[candidate_idx], decreasing = TRUE)]
+  } else if (identical(strategy, "confidence")) {
+    llm_confidence <- annotations$LLMConfidence %||% annotations$Confidence %||%
+      rep(0.5, nrow(annotations))
+    score <- 1 - as_confidence(llm_confidence)
+    ord <- order(score, decreasing = TRUE)
+  } else if (identical(strategy, "random")) {
+    if (!is.null(seed)) {
+      old_seed <- if (exists(".Random.seed", envir = .GlobalEnv)) {
+        get(".Random.seed", envir = .GlobalEnv)
+      } else {
+        NULL
+      }
+      on.exit({
+        if (is.null(old_seed)) {
+          if (exists(".Random.seed", envir = .GlobalEnv)) {
+            rm(".Random.seed", envir = .GlobalEnv)
+          }
+        } else {
+          assign(".Random.seed", old_seed, envir = .GlobalEnv)
+        }
+      }, add = TRUE)
+      set.seed(seed)
+    }
+    ord <- sample(seq_len(nrow(annotations)))
+    score <- rep(0, nrow(annotations))
+    score[ord] <- rev(seq_along(ord))
+  } else if (identical(strategy, "full")) {
+    score <- rep(1, nrow(annotations))
+    ord <- seq_len(nrow(annotations))
+  }
+
+  selected_idx <- head(ord, budget)
+  out <- annotations[selected_idx, , drop = FALSE]
+  out$SelectionStrategy <- strategy
+  out$SelectionScore <- round(score[selected_idx], 3)
+  out$SelectionRank <- seq_len(nrow(out))
+  rownames(out) <- NULL
+  out
+}
+
+#' Create an evidence-guided selective-refinement prompt
 #'
 #' @param markers Named marker list.
 #' @param annotations Annotation data frame with evidence columns.
@@ -260,7 +409,7 @@ create_refinement_prompt <- function(markers, annotations, tissue, species = "Hu
       "Species: %s",
       "Tissue: %s",
       "",
-      "You are performing ontology-guided self-refinement of single-cell cluster annotations.",
+      "You are performing evidence-guided selective refinement of single-cell cluster annotations.",
       "Review only the clusters listed below. The first-pass LLM label, Cell Ontology mapping,",
       "marker-evidence score, and tissue context may disagree.",
       "",
@@ -284,6 +433,25 @@ create_refinement_prompt <- function(markers, annotations, tissue, species = "Hu
     tissue,
     cluster_text
   )
+}
+
+.evidence_conflict_score <- function(annotations) {
+  score <- suppressWarnings(
+    as.numeric(annotations$EvidenceConflictScore %||% NA_real_)
+  )
+
+  if (length(score) != nrow(annotations) || all(is.na(score))) {
+    best <- suppressWarnings(
+      as.numeric(annotations$BestMarkerEvidenceScore %||% 0)
+    )
+    predicted <- suppressWarnings(
+      as.numeric(annotations$MarkerEvidenceScore %||% 0)
+    )
+    score <- pmax(best - predicted, 0)
+  }
+
+  score[is.na(score)] <- 0
+  score
 }
 
 .get_marker_evidence_profiles <- function(tissue = NULL) {

@@ -9,9 +9,19 @@
 #' @param api_key API key (optional, uses env var if not provided)
 #' @param model Model to use ("deepseek" or "ollama")
 #' @param species Species name.
+#' @param self_refine Whether to run selective second-pass refinement.
+#' @param refinement_strategy Refinement selector strategy.
+#' @param refinement_budget Optional maximum number of clusters to refine.
 #' @return Annotation result object
 #' @export
-quick_annotate <- function(markers, tissue, api_key = NULL, model = "deepseek", species = "Human") {
+quick_annotate <- function(markers,
+                           tissue,
+                           api_key = NULL,
+                           model = "deepseek",
+                           species = "Human",
+                           self_refine = FALSE,
+                           refinement_strategy = "evidence",
+                           refinement_budget = NULL) {
   
   # Convert single vector to list
   if (is.character(markers) && !is.list(markers)) {
@@ -37,7 +47,10 @@ quick_annotate <- function(markers, tissue, api_key = NULL, model = "deepseek", 
     model_name = model,
     api_key = api_key,
     use_ontology = TRUE,
-    validate = TRUE
+    validate = TRUE,
+    self_refine = self_refine,
+    refinement_strategy = refinement_strategy,
+    refinement_budget = refinement_budget
   )
 }
 

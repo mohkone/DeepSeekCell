@@ -6,6 +6,7 @@
 ^\.RData$
 ^\.RDataTmp.*$
 ^\.Renviron\.example$
+^\.zenodo\.json$
 ^README\.html$
 ^LICENSE\.md$
 ^install\.R$
@@ -13,6 +14,7 @@
 ^\.\.Rcheck$
 ^DeepSeekCell\.Rcheck$
 ^inst/shiny/\.dockerignore$
+^paper$
 ^benchmark_cache$
 ^benchmark_debug$
 ^results$

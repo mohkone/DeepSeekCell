@@ -1,19 +1,52 @@
 # DeepSeekCell
 
-**An Ontology-Guided Large Language Model Framework and Interactive Shiny Platform for Explainable Cell Type Annotation in Single-Cell RNA Sequencing**
+**An evidence-guided reliability framework for LLM-based single-cell annotation under limited refinement budgets**
 
-DeepSeekCell annotates single-cell RNA-seq clusters from marker genes using an LLM-assisted, ontology-aware workflow. It returns standardized cell type labels, confidence scores, marker-based reasoning, Cell Ontology mappings, validation summaries, and exportable reports through both R functions and an interactive Shiny interface.
+DeepSeekCell formulates marker-based LLM cell type annotation as a reliability
+and resource-allocation problem. A first-pass LLM generates structured
+candidate labels from cluster marker genes. Deterministic marker, ontology, and
+tissue evidence are then used to score reliability, detect biological conflict,
+adjust confidence, and selectively allocate a limited second-pass refinement
+budget to the clusters most likely to benefit.
+
+The software still includes DeepSeek and local Ollama backends plus a Shiny
+interface, but the main contribution is the model-agnostic Evidence-k
+refinement strategy rather than any single LLM or interface.
 
 Current software version: `0.1.0`.
 
-## Core Features
+## Central Computational Problem
 
-- LLM annotation from per-cluster marker genes using DeepSeek or local Ollama.
-- Cell Ontology mapping with exact, synonym, and conservative fuzzy matching provenance.
-- Explainability fields for marker-based reasoning, tissue consistency, possible doublets, and possible contamination.
-- Offline validation metrics, quality score, ontology coverage, and missing-cluster checks.
-- Shiny application for interactive annotation and report download.
-- Benchmark scripts for replicated comparisons against SingleR, scType, scmap, and CellTypist.
+LLM-based annotation workflows often produce one label and one self-reported
+confidence score. When predictions are uncertain or biologically inconsistent,
+users must decide whether to trust the first pass, refine everything, or inspect
+clusters manually. DeepSeekCell addresses the fixed-budget question:
+
+> Which first-pass LLM annotations deserve additional reasoning?
+
+## Algorithmic Components
+
+- Candidate generation from per-cluster marker genes using DeepSeek or local Ollama.
+- Deterministic marker-profile evidence scoring.
+- Cell Ontology validation with exact, synonym, context-aware, and conservative fuzzy matching provenance.
+- Tissue-consistency and marker-prediction consensus scoring.
+- Evidence-adjusted confidence while preserving the original `LLMConfidence`.
+- Fixed-budget refinement selectors: Evidence-k, Confidence-k, Random-k, Full, and None.
+- Refinement provenance columns for first-pass labels, flagging, refinement, label changes, and reasons.
+- Benchmark scripts for paired cached ablations, calibration metrics, selector efficiency, cost, and comparisons against SingleR, scType, scmap, and native CellTypist.
+
+## Reliability Pipeline
+
+```text
+Marker genes
+  -> candidate generation
+  -> marker / ontology / tissue evidence scoring
+  -> conflict detection
+  -> evidence-adjusted confidence
+  -> fixed-budget refinement selection
+  -> optional second-pass reasoning
+  -> final annotation with provenance
+```
 
 ## Installation
 
@@ -73,11 +106,38 @@ result <- annotate_cell_types(
   species = "Human",
   model_name = "deepseek",
   use_ontology = TRUE,
-  validate = TRUE
+  validate = TRUE,
+  calibrate_confidence = TRUE,
+  self_refine = TRUE,
+  refinement_strategy = "evidence",
+  refinement_budget = NULL
 )
 
 result$annotations
 generate_html_report(result, "annotation_report.html")
+```
+
+Use `select_refinement_candidates()` directly when you want to audit or compare
+selectors without making a second LLM call:
+
+```r
+scored <- calibrate_annotation_confidence(
+  annotations = result$annotations,
+  markers = markers,
+  tissue = "PBMC"
+)
+
+evidence_k <- select_refinement_candidates(
+  scored,
+  strategy = "evidence",
+  budget = 3
+)
+
+confidence_k <- select_refinement_candidates(
+  scored,
+  strategy = "confidence",
+  budget = 3
+)
 ```
 
 For local development without network calls:
@@ -95,7 +155,11 @@ testthat::test_dir("tests/testthat")
 shiny::runApp("inst/shiny")
 ```
 
-The app accepts marker genes for up to five clusters, calls the selected model, maps annotations to the Cell Ontology, displays confidence and validation summaries, and exports CSV, XLSX, or HTML reports.
+The app accepts marker genes for up to five clusters, calls the selected model,
+maps annotations to the Cell Ontology, displays confidence and validation
+summaries, and exports CSV, XLSX, or HTML reports. The app is an implementation
+layer for the reliability framework; the algorithm can also be used entirely
+from R scripts.
 
 ## Benchmarking
 
@@ -116,11 +180,11 @@ by majority vote only as a secondary harmonized comparison.
 Set `DEEPSEEK_API_KEY` to include DeepSeekCell; otherwise only non-LLM
 baselines that do not require an API key will run.
 
-The benchmark also writes ablation, calibration, selector-efficiency, stability,
-and exploratory statistical summaries including `benchmark_pairwise_wilcoxon.csv`,
-`benchmark_friedman_tests.csv`, `ablation_confidence_quality.csv`,
-`ablation_refinement_behavior.csv`, `refinement_efficiency_summary.csv`, and
-`benchmark_llm_stability.csv`.
+The benchmark also writes paired ablation, calibration, selector-efficiency,
+stability, runtime, cost, token, and statistical summaries including
+`benchmark_pairwise_wilcoxon.csv`, `benchmark_friedman_tests.csv`,
+`ablation_confidence_quality.csv`, `ablation_refinement_behavior.csv`,
+`refinement_efficiency_summary.csv`, and `benchmark_llm_stability.csv`.
 
 ### Fresh-clone benchmark workflow
 
@@ -197,11 +261,11 @@ Key outputs include `results/benchmark_results_summary.csv`,
 
 - Do not commit API keys, `.Renviron`, `.RData`, benchmark caches, or generated figures.
 - Prefer the full Cell Ontology OBO file at `data/cl.obo`; a small fallback ontology is provided only for offline smoke tests and graceful failure.
-- Result metadata includes model name, model ID, token usage, runtime, ontology fallback status, and schema version.
-- Published manuscript figures and summary tables are committed under `paper/` for audit, while newly generated `results/` files remain ignored by default.
+- Result metadata includes model name, model ID, token usage, runtime, ontology fallback status, refinement strategy, refinement budget, evidence flags, and schema version.
+- The local `paper/` folder is ignored and should not be committed to GitHub.
 
 ## Citation
 
 If you use this software, cite:
 
-> An Ontology-Guided Large Language Model Framework and Interactive Shiny Platform for Explainable Cell Type Annotation in Single-Cell RNA Sequencing.
+> Evidence-guided selective refinement improves the reliability of LLM-based single-cell annotation.

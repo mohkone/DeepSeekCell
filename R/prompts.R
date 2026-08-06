@@ -1,5 +1,5 @@
 # R/prompts.R
-# Enhanced prompt engineering for LLM-based cell type annotation
+# Candidate-generation prompts for LLM-based cell type annotation
 
 #' Create annotation prompt from marker genes
 #'

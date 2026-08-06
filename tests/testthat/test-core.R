@@ -178,7 +178,7 @@ test_that("validation reports quality metrics", {
   expect_equal(validation$summary$ontology_coverage, 0.5)
 })
 
-test_that("confidence calibration preserves strong marker-supported annotations", {
+test_that("evidence-adjusted confidence preserves strong marker-supported annotations", {
   annotations <- data.frame(
     Cluster = "Cluster1",
     CellType = "Beta cell",
@@ -228,8 +228,40 @@ test_that("evidence scoring flags marker conflicts for refinement", {
   expect_equal(scored$EvidenceBestCellType, "beta cell")
   expect_true(scored$EvidenceConflict)
   expect_true(scored$RequiresRefinement)
-  expect_match(prompt, "ontology-guided self-refinement", ignore.case = TRUE)
+  expect_match(prompt, "evidence-guided selective refinement", ignore.case = TRUE)
   expect_match(prompt, "INS", fixed = TRUE)
+})
+
+test_that("fixed-budget selector supports evidence, confidence, and full strategies", {
+  annotations <- data.frame(
+    Cluster = c("Cluster1", "Cluster2", "Cluster3"),
+    CellType = c("Macrophage", "Beta cell", "T cell"),
+    Confidence = c(0.95, 0.2, 0.7),
+    IsMixed = FALSE,
+    TissueConsistency = "expected",
+    CL_ID = c("CL:0000235", "CL:0000169", "CL:0000084"),
+    OntologyLabel = c("macrophage", "type B pancreatic cell", "T cell"),
+    MatchMethod = c("exact", "context_exact", "exact"),
+    OntologyMatchScore = 1,
+    stringsAsFactors = FALSE
+  )
+  markers <- list(
+    Cluster1 = c("INS", "IAPP", "MAFA", "PDX1"),
+    Cluster2 = c("INS", "IAPP", "MAFA", "PDX1"),
+    Cluster3 = c("CD3D", "CD3E", "TRAC")
+  )
+
+  scored <- calibrate_annotation_confidence(annotations, markers, tissue = "Pancreas")
+
+  evidence_k <- select_refinement_candidates(scored, strategy = "evidence", budget = 1)
+  confidence_k <- select_refinement_candidates(scored, strategy = "confidence", budget = 1)
+  full <- select_refinement_candidates(scored, strategy = "full")
+
+  expect_equal(evidence_k$Cluster, "Cluster1")
+  expect_equal(evidence_k$SelectionStrategy, "evidence")
+  expect_equal(confidence_k$Cluster, "Cluster2")
+  expect_equal(full$Cluster, scored$Cluster)
+  expect_equal(nrow(full), 3)
 })
 
 test_that("ontology-disabled evidence removes ontology-only conflict triggers", {

@@ -2,7 +2,7 @@
 % Please edit documentation in R/refinement.R
 \name{create_refinement_prompt}
 \alias{create_refinement_prompt}
-\title{Create an ontology-guided self-refinement prompt}
+\title{Create an evidence-guided selective-refinement prompt}
 \usage{
 create_refinement_prompt(markers, annotations, tissue, species = "Human")
 }
@@ -19,5 +19,5 @@ create_refinement_prompt(markers, annotations, tissue, species = "Human")
 Character prompt.
 }
 \description{
-Create an ontology-guided self-refinement prompt
+Create an evidence-guided selective-refinement prompt
 }

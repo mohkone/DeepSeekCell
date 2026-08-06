@@ -1,5 +1,5 @@
 Package: DeepSeekCell
-Title: Ontology-Guided LLM Cell Type Annotation for Single-Cell RNA-seq
+Title: Evidence-Guided Reliability Framework for LLM Cell Annotation
 Version: 0.1.0
 Date: 2026-06-11
 Authors@R: c(
@@ -9,12 +9,14 @@ Authors@R: c(
   )
 Author: Mohamed Kone [aut], Shulin Wang [aut, cre], Hunan University [cph]
 Maintainer: Shulin Wang <books@hnu.edu.cn>
-Description: Provides an ontology-guided large language model framework and
-    interactive Shiny platform for explainable cell type annotation in
-    single-cell RNA sequencing. The package converts cluster marker genes into
-    standardized, confidence-scored annotations, maps labels to the Cell
-    Ontology, validates result quality, exports reports, and supports
-    reproducible benchmarking against established annotation methods.
+Description: Provides an evidence-guided reliability framework for
+    marker-based large language model cell type annotation in single-cell RNA
+    sequencing. The package converts cluster marker genes into structured
+    candidate annotations, scores deterministic marker, ontology and tissue
+    evidence, computes evidence-adjusted confidence, selectively refines
+    high-conflict predictions under a fixed budget, maps labels to the Cell
+    Ontology, exports reports, and supports reproducible benchmarking against
+    established annotation methods.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

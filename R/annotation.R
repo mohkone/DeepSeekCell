@@ -1,8 +1,9 @@
 # R/annotation.R
 #' Core annotation orchestration
 #'
-#' Coordinates the entire cell type annotation pipeline from marker genes
-#' to final annotated results with ontology mapping.
+#' Coordinates the marker-based LLM annotation pipeline from first-pass
+#' candidate generation to evidence-guided reliability assessment and optional
+#' fixed-budget refinement.
 #'
 #' @param markers Named list of marker genes per cluster
 #' @param tissue Tissue name
@@ -14,9 +15,17 @@
 #' @param max_genes_per_cluster Maximum marker genes to include per cluster.
 #' @param ontology_path Optional path to a Cell Ontology OBO file.
 #' @param calibrate_confidence Whether to replace raw LLM confidence with
-#' ontology- and marker-calibrated confidence while preserving LLMConfidence.
-#' @param self_refine Whether to run an ontology-guided refinement call for
-#' clusters with conflicting marker and first-pass annotation evidence.
+#' evidence-adjusted confidence while preserving LLMConfidence.
+#' @param self_refine Whether to run a selective second-pass refinement call.
+#' @param refinement_strategy Strategy for selecting refined clusters. Use
+#' `"evidence"` for Evidence-k, `"confidence"` for Confidence-k, `"random"` for
+#' Random-k, `"full"` for FullRefined, or `"none"` to disable selection.
+#' @param refinement_budget Maximum number of clusters to refine. If `NULL`,
+#' Evidence-k refines all evidence-conflicted clusters, Confidence-k and
+#' Random-k use the same matched budget, and FullRefined refines all clusters.
+#' @param use_ontology_evidence Whether ontology mapping contributes to
+#' evidence-adjusted confidence and conflict detection.
+#' @param refinement_seed Optional random seed for Random-k selection.
 #' @param return_prompt Whether to include the submitted prompt in the result.
 #' @return Comprehensive result object
 #' @export
@@ -32,8 +41,19 @@ annotate_cell_types <- function(markers,
                                 ontology_path = NULL,
                                 calibrate_confidence = TRUE,
                                 self_refine = FALSE,
+                                refinement_strategy = c(
+                                  "evidence",
+                                  "confidence",
+                                  "random",
+                                  "full",
+                                  "none"
+                                ),
+                                refinement_budget = NULL,
+                                use_ontology_evidence = TRUE,
+                                refinement_seed = NULL,
                                 return_prompt = FALSE) {
   start_time <- Sys.time()
+  refinement_strategy <- match.arg(refinement_strategy)
   
   if (is_blank(tissue)) {
     stop("tissue must be a non-empty character value.", call. = FALSE)
@@ -102,8 +122,11 @@ annotate_cell_types <- function(markers,
 
   refinement <- list(
     enabled = isTRUE(self_refine),
+    strategy = refinement_strategy,
+    budget = refinement_budget,
     attempted = FALSE,
     success = NA,
+    n_flagged = 0,
     n_candidates = 0,
     n_reviewed = 0,
     n_returned = 0,
@@ -116,9 +139,16 @@ annotate_cell_types <- function(markers,
   refined_clusters <- character()
   label_changed_clusters <- character()
   confidence_changed_clusters <- character()
+  selected_clusters <- character()
+  selected_scores <- numeric()
 
   preliminary_annotations <- if (isTRUE(calibrate_confidence) || isTRUE(self_refine)) {
-    calibrate_annotation_confidence(annotations, markers, tissue = tissue)
+    calibrate_annotation_confidence(
+      annotations,
+      markers,
+      tissue = tissue,
+      use_ontology_evidence = use_ontology_evidence
+    )
   } else {
     annotations
   }
@@ -128,11 +158,22 @@ annotate_cell_types <- function(markers,
   requires_refinement <- as_flag(requires_refinement)
   requires_refinement[is.na(requires_refinement)] <- FALSE
   flagged_clusters <- preliminary_annotations$Cluster[requires_refinement]
+  refinement$n_flagged <- length(flagged_clusters)
 
   if (isTRUE(self_refine)) {
-    refinement_candidates <- preliminary_annotations[requires_refinement, , drop = FALSE]
-    refinement$n_candidates <- nrow(refinement_candidates)
+    refinement_candidates <- select_refinement_candidates(
+      preliminary_annotations,
+      strategy = refinement_strategy,
+      budget = refinement_budget,
+      seed = refinement_seed
+    )
+    selected_clusters <- refinement_candidates$Cluster %||% character()
+    selected_scores <- refinement_candidates$SelectionScore %||% numeric()
+    refinement$n_candidates <- length(flagged_clusters)
     refinement$n_reviewed <- nrow(refinement_candidates)
+    refinement$n_selected <- nrow(refinement_candidates)
+    refinement$selected_clusters <- selected_clusters
+    refinement$selection_scores <- selected_scores
 
     if (nrow(refinement_candidates) > 0) {
       refinement$attempted <- TRUE
@@ -184,7 +225,12 @@ annotate_cell_types <- function(markers,
   }
 
   if (isTRUE(calibrate_confidence)) {
-    annotations <- calibrate_annotation_confidence(annotations, markers, tissue = tissue)
+    annotations <- calibrate_annotation_confidence(
+      annotations,
+      markers,
+      tissue = tissue,
+      use_ontology_evidence = use_ontology_evidence
+    )
   }
   annotations <- .add_refinement_provenance(
     annotations = annotations,
@@ -229,7 +275,11 @@ annotate_cell_types <- function(markers,
       ontology_enabled = isTRUE(use_ontology),
       ontology_is_fallback = ontology_is_fallback,
       confidence_calibrated = isTRUE(calibrate_confidence),
+      ontology_evidence_enabled = isTRUE(use_ontology_evidence),
       self_refinement_enabled = isTRUE(self_refine),
+      self_refinement_strategy = refinement_strategy,
+      self_refinement_budget = refinement_budget,
+      self_refinement_flagged = refinement$n_flagged,
       self_refinement_attempted = isTRUE(refinement$attempted),
       self_refinement_updates = refinement$n_updated,
       self_refinement_reviewed = refinement$n_reviewed,

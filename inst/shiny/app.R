@@ -145,7 +145,7 @@ ui <- fluidPage(
   "))),
   div(class = "text-center", style = "background-color: #2c3e50; color: white; padding: 20px;",
       h1("DeepSeekCell", span(class = "live-badge", "LIVE MODE")),
-      h4("Ontology-Guided LLM Framework for Explainable Cell Type Annotation"),
+      h4("Evidence-Guided Reliability Framework for LLM Cell Annotation"),
       p(paste("Version", deepseekcell_version(), "| For research use only"))),
   sidebarLayout(
     sidebarPanel(width = 4,
@@ -159,6 +159,33 @@ ui <- fluidPage(
                  textInput("tissue", "Tissue", value = "PBMC"),
                  selectInput("species", "Species", choices = c("Human", "Mouse", "Rat")),
                  checkboxInput("use_ontology", "Map to Cell Ontology", value = TRUE),
+                 checkboxInput("self_refine", "Enable selective refinement", value = FALSE),
+                 conditionalPanel(
+                   condition = "input.self_refine == true",
+                   selectInput(
+                     "refinement_strategy",
+                     "Refinement selector",
+                     choices = c(
+                       "Evidence-k" = "evidence",
+                       "Confidence-k" = "confidence",
+                       "Random-k" = "random",
+                       "Full refinement" = "full"
+                     ),
+                     selected = "evidence"
+                   ),
+                   numericInput(
+                     "refinement_budget",
+                     "Refinement budget k",
+                     value = NA,
+                     min = 1,
+                     step = 1
+                   ),
+                   checkboxInput(
+                     "use_ontology_evidence",
+                     "Use ontology evidence in selector",
+                     value = TRUE
+                   )
+                 ),
                  textAreaInput("c1", "Cluster 1", rows = 2, placeholder = "CD3D, CD3E, CD8A"),
                  textAreaInput("c2", "Cluster 2", rows = 2, placeholder = "CD14, LYZ, FCGR3A"),
                  textAreaInput("c3", "Cluster 3", rows = 2, placeholder = "CD79A, MS4A1, CD19"),
@@ -206,6 +233,7 @@ ui <- fluidPage(
                                 tags$li("Enter your DeepSeek API key, or choose Ollama for local annotation."),
                                tags$li("Specify tissue and species."),
                                tags$li("Input marker genes for up to 5 clusters (comma-, semicolon-, or newline-separated)."),
+                               tags$li("Optionally enable selective refinement and choose an Evidence-k, Confidence-k, Random-k, or Full selector."),
                                tags$li("Click 'Annotate' and wait 15–30 seconds."),
                                tags$li("Download results as CSV, Excel, or HTML report.")
                              ),
@@ -216,7 +244,7 @@ ui <- fluidPage(
                              ),
                              h4("Citation"),
                              p("If you use DeepSeekCell, please cite:"),
-                             p(tags$em("An Ontology-Guided Large Language Model Framework and Interactive Shiny Platform for Explainable Cell Type Annotation in Single-Cell RNA Sequencing."))
+                             p(tags$em("Evidence-guided selective refinement improves the reliability of LLM-based single-cell annotation."))
                          ))
               )
     )
@@ -276,7 +304,12 @@ server <- function(input, output, session) {
       return()
     }
     
-    showNotification("Calling API... This may take 15-30 seconds.",
+    budget <- suppressWarnings(as.integer(input$refinement_budget))
+    if (is.na(budget) || budget < 1) {
+      budget <- NULL
+    }
+
+    showNotification("Running annotation... selective refinement may add a second model call.",
                      type = "message", duration = NULL, id = "status")
     
     res <- tryCatch(
@@ -287,7 +320,11 @@ server <- function(input, output, session) {
         model_name = input$model,
         api_key = api_key_to_use,
         use_ontology = input$use_ontology,
-        validate = TRUE
+        validate = TRUE,
+        self_refine = isTRUE(input$self_refine),
+        refinement_strategy = input$refinement_strategy %||% "evidence",
+        refinement_budget = budget,
+        use_ontology_evidence = isTRUE(input$use_ontology_evidence)
       ),
       error = function(e) { list(success = FALSE, error = e$message) }
     )
@@ -557,12 +594,25 @@ server <- function(input, output, session) {
     req(values$result$success)
     m <- values$result$metadata
     data.frame(
-      Metric = c("API Latency (sec)", "Tokens per Second", "Cost per Token", "Cost per Cluster"),
+      Metric = c(
+        "API Latency (sec)",
+        "Tokens per Second",
+        "Cost per Token",
+        "Cost per Cluster",
+        "Refinement Strategy",
+        "Evidence-Flagged Clusters",
+        "Refined Clusters",
+        "Label Changes"
+      ),
       Value = c(
         sprintf("%.2f", m$api_latency_sec),
         sprintf("%.0f", m$tokens_used / max(m$api_latency_sec, 1)),
         sprintf("$%.8f", m$estimated_cost_usd / max(m$tokens_used, 1)),
-        sprintf("$%.4f", m$estimated_cost_usd / m$n_clusters)
+        sprintf("$%.4f", m$estimated_cost_usd / m$n_clusters),
+        m$self_refinement_strategy %||% "none",
+        m$self_refinement_flagged %||% 0,
+        m$self_refinement_reviewed %||% 0,
+        m$self_refinement_label_changes %||% 0
       )
     )
   })

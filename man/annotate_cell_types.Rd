@@ -16,6 +16,10 @@ annotate_cell_types(
   ontology_path = NULL,
   calibrate_confidence = TRUE,
   self_refine = FALSE,
+  refinement_strategy = c("evidence", "confidence", "random", "full", "none"),
+  refinement_budget = NULL,
+  use_ontology_evidence = TRUE,
+  refinement_seed = NULL,
   return_prompt = FALSE
 )
 }
@@ -39,10 +43,22 @@ annotate_cell_types(
 \item{ontology_path}{Optional path to a Cell Ontology OBO file.}
 
 \item{calibrate_confidence}{Whether to replace raw LLM confidence with
-ontology- and marker-calibrated confidence while preserving LLMConfidence.}
+evidence-adjusted confidence while preserving LLMConfidence.}
 
-\item{self_refine}{Whether to run an ontology-guided refinement call for
-clusters with conflicting marker and first-pass annotation evidence.}
+\item{self_refine}{Whether to run a selective second-pass refinement call.}
+
+\item{refinement_strategy}{Strategy for selecting refined clusters. Use
+\code{"evidence"} for Evidence-k, \code{"confidence"} for Confidence-k, \code{"random"} for
+Random-k, \code{"full"} for FullRefined, or \code{"none"} to disable selection.}
+
+\item{refinement_budget}{Maximum number of clusters to refine. If \code{NULL},
+Evidence-k refines all evidence-conflicted clusters, Confidence-k and
+Random-k use the same matched budget, and FullRefined refines all clusters.}
+
+\item{use_ontology_evidence}{Whether ontology mapping contributes to
+evidence-adjusted confidence and conflict detection.}
+
+\item{refinement_seed}{Optional random seed for Random-k selection.}
 
 \item{return_prompt}{Whether to include the submitted prompt in the result.}
 }
@@ -50,6 +66,7 @@ clusters with conflicting marker and first-pass annotation evidence.}
 Comprehensive result object
 }
 \description{
-Coordinates the entire cell type annotation pipeline from marker genes
-to final annotated results with ontology mapping.
+Coordinates the marker-based LLM annotation pipeline from first-pass
+candidate generation to evidence-guided reliability assessment and optional
+fixed-budget refinement.
 }

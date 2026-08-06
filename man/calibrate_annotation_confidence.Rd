@@ -2,7 +2,7 @@
 % Please edit documentation in R/refinement.R
 \name{calibrate_annotation_confidence}
 \alias{calibrate_annotation_confidence}
-\title{Attach calibrated confidence and evidence columns to annotations}
+\title{Attach evidence-adjusted confidence and evidence columns to annotations}
 \usage{
 calibrate_annotation_confidence(
   annotations,
@@ -22,9 +22,9 @@ calibrate_annotation_confidence(
 composite confidence and conflict-detection fields.}
 }
 \value{
-Annotation data frame with evidence and calibrated confidence.
+Annotation data frame with evidence and evidence-adjusted confidence.
 }
 \description{
 The original model confidence is retained as \code{LLMConfidence}, while
-\code{Confidence} is replaced by a deterministic calibrated confidence.
+\code{Confidence} is replaced by a deterministic evidence-adjusted confidence.
 }

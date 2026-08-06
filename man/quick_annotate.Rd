@@ -9,7 +9,10 @@ quick_annotate(
   tissue,
   api_key = NULL,
   model = "deepseek",
-  species = "Human"
+  species = "Human",
+  self_refine = FALSE,
+  refinement_strategy = "evidence",
+  refinement_budget = NULL
 )
 }
 \arguments{
@@ -22,6 +25,12 @@ quick_annotate(
 \item{model}{Model to use ("deepseek" or "ollama")}
 
 \item{species}{Species name.}
+
+\item{self_refine}{Whether to run selective second-pass refinement.}
+
+\item{refinement_strategy}{Refinement selector strategy.}
+
+\item{refinement_budget}{Optional maximum number of clusters to refine.}
 }
 \value{
 Annotation result object
