@@ -33,6 +33,22 @@ DEVELOPMENT_DATASETS <- c(
   "ZilionisLung"
 )
 
+OPTIONAL_MANIFEST_COLUMNS <- c(
+  "StudyAccession",
+  "SourceRepository",
+  "Center",
+  "Laboratory",
+  "Country",
+  "SequencingPlatform",
+  "Chemistry",
+  "DiseaseStatus",
+  "Condition",
+  "DonorCount",
+  "CellCount",
+  "ExpectedClusters",
+  "IsProspectiveDataset"
+)
+
 load_locked_spec <- function(spec_path = SPEC_PATH) {
   if (!file.exists(spec_path)) {
     stop("Frozen reliability spec is missing: ", spec_path, call. = FALSE)
@@ -67,6 +83,12 @@ validate_external_manifest <- function(manifest_path) {
   manifest$Tissue <- trimws(manifest$Tissue)
   manifest$Species <- trimws(manifest$Species)
   manifest$PreparedRdsPath <- trimws(manifest$PreparedRdsPath)
+  for (column in OPTIONAL_MANIFEST_COLUMNS) {
+    if (!column %in% names(manifest)) {
+      manifest[[column]] <- NA_character_
+    }
+    manifest[[column]] <- trimws(as.character(manifest[[column]]))
+  }
 
   manifest <- manifest[nzchar(manifest$Dataset), , drop = FALSE]
   if (nrow(manifest) == 0) {
@@ -93,6 +115,63 @@ validate_external_manifest <- function(manifest_path) {
   manifest
 }
 
+external_manifest_metadata <- function(manifest) {
+  keep <- intersect(
+    c(
+      "Dataset", "StudyAccession", "SourceRepository", "Center", "Laboratory",
+      "Country", "SequencingPlatform", "Chemistry", "DiseaseStatus",
+      "Condition", "DonorCount", "CellCount", "ExpectedClusters",
+      "IsUnseenTissue", "IsProspectiveDataset", "MarkerSource",
+      "SelectionRationale", "Notes"
+    ),
+    names(manifest)
+  )
+  meta <- manifest[keep]
+  meta$ExternalValidationDataset <- TRUE
+  meta
+}
+
+add_external_validation_metadata <- function(x, manifest) {
+  if (!is.data.frame(x) || nrow(x) == 0 || !"Dataset" %in% names(x)) {
+    return(x)
+  }
+  meta <- external_manifest_metadata(manifest)
+  idx <- match(x$Dataset, meta$Dataset)
+  for (column in setdiff(names(meta), "Dataset")) {
+    value <- meta[[column]][idx]
+    if (column %in% names(x)) {
+      missing <- is.na(x[[column]]) | !nzchar(as.character(x[[column]]))
+      x[[column]][missing] <- value[missing]
+    } else {
+      x[[column]] <- value
+    }
+  }
+  x
+}
+
+external_dataset_scale <- function(data) {
+  markers <- data$markers %||% list()
+  marker_lengths <- lengths(markers)
+  data.frame(
+    ClusterCount = length(markers),
+    MarkerGeneCountTotal = sum(marker_lengths, na.rm = TRUE),
+    MarkerGenesMean = if (length(marker_lengths) > 0) mean(marker_lengths, na.rm = TRUE) else NA_real_,
+    MarkerGenesMedian = if (length(marker_lengths) > 0) stats::median(marker_lengths, na.rm = TRUE) else NA_real_,
+    MarkerGenesMax = if (length(marker_lengths) > 0) max(marker_lengths, na.rm = TRUE) else NA_real_,
+    stringsAsFactors = FALSE
+  )
+}
+
+add_external_dataset_scale <- function(x, scale) {
+  if (!is.data.frame(x) || nrow(x) == 0) {
+    return(x)
+  }
+  for (column in names(scale)) {
+    x[[column]] <- scale[[column]][[1]]
+  }
+  x
+}
+
 load_prepared_external_dataset <- function(row) {
   path <- row$PreparedRdsPath[[1]]
   if (!file.exists(path)) {
@@ -113,6 +192,7 @@ load_prepared_external_dataset <- function(row) {
   data$tissue <- data$tissue %||% row$Tissue[[1]]
   data$species <- data$species %||% row$Species[[1]]
   data$purity <- data$purity %||% NULL
+  data$external_metadata <- as.list(row[intersect(names(row), OPTIONAL_MANIFEST_COLUMNS)])
 
   if (is.null(names(data$markers)) || any(!nzchar(names(data$markers)))) {
     stop("markers must be a named list keyed by cluster id.", call. = FALSE)
@@ -159,6 +239,11 @@ write_external_validation_lock <- function(manifest,
     manifest_md5 = unname(tools::md5sum(attr(manifest, "manifest_path"))),
     datasets = manifest$Dataset,
     tissues = manifest$Tissue,
+    centers = manifest$Center,
+    laboratories = manifest$Laboratory,
+    sequencing_platforms = manifest$SequencingPlatform,
+    disease_status = manifest$DiseaseStatus,
+    prospective_datasets = manifest$IsProspectiveDataset,
     prepared_rds_paths = manifest$PreparedRdsPath,
     prepared_rds_md5 = vapply(
       manifest$PreparedRdsPath,
@@ -226,6 +311,7 @@ run_locked_external_validation <- function(manifest_path,
     for (i in seq_len(nrow(manifest))) {
       row <- manifest[i, , drop = FALSE]
       dataset <- load_prepared_external_dataset(row)
+      dataset_scale <- external_dataset_scale(dataset)
       message("External validation replicate ", replicate, " - ", row$Dataset)
       result <- run_llm_ablation_wrapper(
         dataset_name = row$Dataset,
@@ -239,6 +325,11 @@ run_locked_external_validation <- function(manifest_path,
         include_full_refinement = TRUE
       )
       result$results$Replicate <- replicate
+      result$results <- add_external_dataset_scale(result$results, dataset_scale)
+      result$confidence_quality <- add_external_dataset_scale(result$confidence_quality, dataset_scale)
+      result$reliability <- add_external_dataset_scale(result$reliability, dataset_scale)
+      result$refinement_behavior <- add_external_dataset_scale(result$refinement_behavior, dataset_scale)
+
       all_results[[length(all_results) + 1]] <- result$results
       all_confidence[[length(all_confidence) + 1]] <- result$confidence_quality
       all_reliability[[length(all_reliability) + 1]] <- result$reliability
@@ -246,10 +337,10 @@ run_locked_external_validation <- function(manifest_path,
     }
   }
 
-  results <- dplyr::bind_rows(all_results)
-  confidence <- dplyr::bind_rows(all_confidence)
-  reliability <- dplyr::bind_rows(all_reliability)
-  refinement <- dplyr::bind_rows(all_refinement)
+  results <- add_external_validation_metadata(dplyr::bind_rows(all_results), manifest)
+  confidence <- add_external_validation_metadata(dplyr::bind_rows(all_confidence), manifest)
+  reliability <- add_external_validation_metadata(dplyr::bind_rows(all_reliability), manifest)
+  refinement <- add_external_validation_metadata(dplyr::bind_rows(all_refinement), manifest)
 
   utils::write.csv(results, "results/external_validation_results_full.csv", row.names = FALSE)
   utils::write.csv(confidence, "results/external_validation_confidence_quality.csv", row.names = FALSE)

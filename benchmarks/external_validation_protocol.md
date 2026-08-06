@@ -63,10 +63,23 @@ The confirmatory external set should include at least:
 - One independent neural dataset.
 - One challenging disease or tumour dataset.
 - Preferably one dataset from a previously unseen tissue.
+- Multiple data sources or consortia, for example Human Cell Atlas,
+  CELLxGENE, Tabula Sapiens, or laboratory-specific studies.
+- Multiple sequencing platforms where possible, including 10x Chromium,
+  Smart-seq2, Drop-seq, Seq-Well, microwell, or inDrop.
+- Healthy and disease or tumour conditions when compatible labels are
+  available.
 
 Datasets must be selected before running the locked analysis. The selection
 should be recorded in `benchmarks/external_validation_manifest.csv` using the
 template `benchmarks/external_validation_manifest_template.csv`.
+
+The manifest records study accession, source repository, center, laboratory,
+country, sequencing platform, chemistry, disease status, condition, donor
+count, cell count, expected cluster count, prospective status, and the selection
+rationale. These fields are copied into the result tables and the validation
+lock so stratified robustness summaries can be generated without retuning the
+method.
 
 ## Primary Endpoint
 
@@ -99,6 +112,9 @@ Secondary outcomes include:
 - Final accuracy, macro-F1, balanced accuracy, ARI, and Cell Ontology clade accuracy.
 - Raw versus evidence-adjusted confidence quality: Brier score, binary correctness NLL, ECE, AUROC, and AURC.
 - Runtime, prompt tokens, completion tokens, total tokens, API cost, and cost per corrected error.
+- Stratified correction efficiency, calibration, runtime, cost, and oracle gap
+  by center, sequencing platform, disease status, prospective status, cluster
+  count, cell count, and marker-list size.
 
 ## Paired Design
 
@@ -148,6 +164,49 @@ tau = 0.25, 0.30, ..., 0.70
 
 Report selector rank correlation, selected-cluster Jaccard overlap, correction
 efficiency, recovery rate, and correct-to-wrong revisions across the grid.
+
+## Multi-Center and Platform Robustness
+
+After the locked validation run completes, generate reviewer-facing robustness
+tables with:
+
+```bash
+Rscript benchmarks/analyse_external_validation_robustness.R \
+  results/external_validation_results_full.csv \
+  results/external_validation_refinement_behavior.csv \
+  results/external_validation_confidence_quality.csv \
+  results/external_validation_robustness
+```
+
+The script writes:
+
+- `*_dataset_scorecard.csv`
+- `*_refinement_by_domain.csv`
+- `*_runtime_cost_by_domain.csv`
+- `*_confidence_by_domain.csv`
+- `*_selector_contrasts.csv`
+- platform-efficiency, scale-efficiency, and runtime-scaling PDF plots when
+  `ggplot2` is available.
+
+These summaries answer whether the frozen reliability framework remains stable
+across laboratories, repositories, tissues, technologies, disease conditions,
+prospective datasets, dataset scales, and marker-list sizes. They are evidence
+analyses, not additional model-selection steps.
+
+## Benchmark Release
+
+After the final benchmark and external validation are complete, generate a
+release manifest:
+
+```bash
+Rscript benchmarks/build_benchmark_release_manifest.R results/benchmark_release_manifest.csv
+```
+
+The manifest records paths, artifact categories, file sizes, MD5 hashes, and
+archive recommendations for result tables, figures, debug decisions, cached LLM
+responses, validation locks, frozen specifications, and benchmark scripts. Large
+prepared dataset caches are excluded by default and should be released only
+when the original data license permits redistribution.
 
 ## Reporting
 

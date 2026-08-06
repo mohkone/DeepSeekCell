@@ -283,6 +283,20 @@ truth vector `truth`, and optional `tissue`, `species`, and `purity` fields. The
 runner preserves the paired design: one hashed first-pass response per
 model-dataset-replicate block is reused by all selectors.
 
+The external-validation manifest also records study accession, source
+repository, center, laboratory, country, sequencing platform, chemistry,
+disease status, condition, donor count, cell count, expected cluster count, and
+prospective status. These metadata are copied into the validation results so
+multi-center and platform robustness can be summarized after the locked run:
+
+```bash
+Rscript benchmarks/analyse_external_validation_robustness.R \
+  results/external_validation_results_full.csv \
+  results/external_validation_refinement_behavior.csv \
+  results/external_validation_confidence_quality.csv \
+  results/external_validation_robustness
+```
+
 Secondary robustness checks can be run with:
 
 ```bash
@@ -292,6 +306,17 @@ Rscript benchmarks/sensitivity_analysis.R cluster_level_input.csv results/sensit
 When no input is supplied, the script writes
 `results/sensitivity_input_schema.csv` describing the expected cluster-level
 columns.
+
+To prepare a reproducible benchmark archive manifest for GitHub/Zenodo release:
+
+```bash
+Rscript benchmarks/build_benchmark_release_manifest.R results/benchmark_release_manifest.csv
+```
+
+The manifest records relative paths, artifact categories, file sizes, MD5
+hashes, modification times, and whether each artifact is recommended for public
+archiving. Large derived dataset caches are excluded by default and can be
+included only when redistribution is permitted.
 
 ### Fresh-clone benchmark workflow
 
