@@ -188,6 +188,19 @@ single-tissue transfer matrices, learning curves, domain-shift summaries,
 oracle-gap analyses, calibration comparisons, and a failure taxonomy. The
 protocol is documented in `benchmarks/generalization_protocol.md`.
 
+After a benchmark run, characterize when refinement is useful with the
+meta-benchmark workflow:
+
+```bash
+Rscript benchmarks/analyse_meta_benchmark.R results results/meta_benchmark
+```
+
+This writes dataset difficulty profiles, method gains versus difficulty,
+selector benefit versus difficulty, Pareto fronts, biological error taxonomy,
+reliability curves, decision curves, and descriptive benefit-predictor outputs.
+The analysis is documented in `benchmarks/meta_benchmark_protocol.md` and is
+intended as scientific interpretation, not selector tuning.
+
 For local development without network calls:
 
 ```r
