@@ -8,6 +8,7 @@
 
 # Data files (large, or user-provided)
 data/cl.obo
+data/external_prepared/
 scType/ScTypeDB_full.xlsx
 
 # Environment variables

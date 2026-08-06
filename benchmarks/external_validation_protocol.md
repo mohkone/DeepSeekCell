@@ -81,6 +81,18 @@ rationale. These fields are copied into the result tables and the validation
 lock so stratified robustness summaries can be generated without retuning the
 method.
 
+Prepared RDS files should be generated with the registry-driven adapter system
+in `benchmarks/external_datasets/`. The adapter protocol is documented in:
+
+```text
+benchmarks/external_datasets/adapter_protocol.md
+```
+
+The initial planned registry includes independent immune, pancreas, neural, and
+unseen-tissue entries. Rows should remain `pending` or `planned` until local
+source files, label mappings, leakage flags, and eligibility decisions are
+fixed before inference.
+
 ## Primary Endpoint
 
 The primary endpoint is correction efficiency under a matched refinement budget:

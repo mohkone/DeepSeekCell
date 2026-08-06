@@ -296,6 +296,21 @@ truth vector `truth`, and optional `tissue`, `species`, and `purity` fields. The
 runner preserves the paired design: one hashed first-pass response per
 model-dataset-replicate block is reused by all selectors.
 
+External RDS inputs can be generated reproducibly from a registry-driven adapter
+pipeline:
+
+```bash
+Rscript benchmarks/external_datasets/prepare_all_external_datasets.R \
+  benchmarks/external_datasets/registry.csv \
+  data/external_prepared \
+  benchmarks/external_validation_manifest.csv
+```
+
+Study-specific entrypoints are available for the initial planned panel:
+`prepare_wilk2020.R`, `prepare_segerstolpe2016.R`, and
+`prepare_motor_cortex2021.R`. The adapter protocol and leakage checks are
+documented in `benchmarks/external_datasets/adapter_protocol.md`.
+
 The external-validation manifest also records study accession, source
 repository, center, laboratory, country, sequencing platform, chemistry,
 disease status, condition, donor count, cell count, expected cluster count, and

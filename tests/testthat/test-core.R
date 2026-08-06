@@ -427,3 +427,47 @@ test_that("refinement provenance distinguishes reviewed rows from label changes"
   expect_false(final$RefinementChangedLabel[2])
   expect_equal(final$FirstPassCellType[1], "Macrophage")
 })
+
+test_that("external prepared dataset validator enforces locked RDS contract", {
+  source(test_path("../../benchmarks/external_datasets/validate_prepared_dataset.R"))
+
+  prepared <- list(
+    markers = list(
+      `0` = c("CD3D", "CD3E"),
+      `1` = c("MS4A1", "CD79A")
+    ),
+    truth = c(`0` = "T cell", `1` = "B cell"),
+    tissue = "PBMC",
+    species = "Human",
+    purity = c(`0` = 0.95, `1` = 0.90),
+    metadata = list(Dataset = "SyntheticExternal")
+  )
+
+  valid <- validate_external_dataset(prepared)
+  expect_true(valid$valid)
+  expect_equal(valid$n_clusters, 2)
+
+  broken <- prepared
+  names(broken$truth) <- c("0", "missing")
+  invalid <- validate_external_dataset(broken)
+  expect_false(invalid$valid)
+  expect_true(any(grepl("names\\(markers\\)", invalid$errors)))
+
+  registry_row <- data.frame(
+    Dataset = "SyntheticExternal",
+    IsDevelopmentDataset = "FALSE",
+    ConfirmatoryStatus = "confirmatory",
+    AppearedInMarkerProfileDevelopment = "FALSE",
+    LabelsInformedHarmonizationRules = "TRUE",
+    MarkerListsInspectedBeforeFreeze = "FALSE",
+    SameStudyInRiskTraining = "FALSE",
+    DonorOverlapKnown = "FALSE",
+    AnnotationSource = "author_provided",
+    InclusionDecision = "include",
+    SelectionRationale = "Synthetic validator test",
+    stringsAsFactors = FALSE
+  )
+  leakage <- validate_external_dataset(prepared, registry_row)
+  expect_false(leakage$valid)
+  expect_true(any(grepl("LabelsInformedHarmonizationRules", leakage$errors)))
+})
