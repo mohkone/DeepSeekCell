@@ -174,3 +174,17 @@ Primary comparisons:
 
 The manuscript should report the deterministic Evidence-k results as the frozen
 v1.0 baseline and Risk-k as the learned v1.1 method.
+
+## Cross-Tissue Generalization
+
+After Risk-k has been trained and explained, evaluate whether it transfers to
+unseen biological domains with:
+
+```bash
+Rscript benchmarks/analyse_reliability_generalization.R results/benchmark_debug results/reliability_generalization first_pass_error 10
+```
+
+The analysis is described in `benchmarks/generalization_protocol.md`. It
+performs leave-one-tissue-out validation, pairwise tissue transfer, learning
+curves, domain-shift analysis, calibration comparisons, failure taxonomy, and
+oracle-gap analysis without adding another selector or retuning the model.

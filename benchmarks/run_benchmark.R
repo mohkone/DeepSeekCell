@@ -455,6 +455,8 @@ evaluate_ablation_arm <- function(annotations,
   debug_df <- data.frame(
     Replicate = replicate,
     Dataset = dataset_name,
+    Tissue = tissue,
+    Species = species,
     Method = arm_name,
     LLMBackend = llm_backend,
     LLMModelID = llm_model_id,

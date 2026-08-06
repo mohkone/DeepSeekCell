@@ -60,6 +60,7 @@ build_training_features <- function(debug_dir = file.path("results", "benchmark_
   full <- read_debug_files(debug_dir, "-FullRefined_debug\\.csv$")
 
   base <- if (nrow(calibrated) > 0) calibrated else evidence
+  base <- add_training_domain_metadata(base)
   if (nrow(base) == 0) {
     stop(
       "No calibrated/evidence debug files found in ", debug_dir,
@@ -78,6 +79,7 @@ build_training_features <- function(debug_dir = file.path("results", "benchmark_
   base$FirstPassIncorrect <- !base$InitiallyCorrect
 
   if (nrow(full) > 0 && all(key_cols %in% names(full))) {
+    full <- add_training_domain_metadata(full)
     full$FullRefinedCorrect <- full$HarmonisedPrediction == full$HarmonisedTruth
     full_key <- paste(full$Dataset, full$Replicate, full$Cluster, sep = "|")
     base_key <- paste(base$Dataset, base$Replicate, base$Cluster, sep = "|")
@@ -91,6 +93,8 @@ build_training_features <- function(debug_dir = file.path("results", "benchmark_
   metadata_cols <- intersect(
     c(
       "Dataset", "Replicate", "Cluster", "Method", "LLMBackend", "LLMModelID",
+      "Tissue", "Species", "Confidence", "RefinementSelector",
+      "RefinementBudgetK", "RequiresRefinement", "EvidenceConflict",
       "RawPrediction", "RawTruth", "HarmonisedPrediction", "HarmonisedTruth",
       "InitiallyCorrect", "FirstPassIncorrect", "FullRefinedCorrect",
       "RefinementBeneficial", "RefinementHarmful", "SourceFile"
@@ -98,7 +102,61 @@ build_training_features <- function(debug_dir = file.path("results", "benchmark_
     names(base)
   )
   metadata <- base[metadata_cols]
+  if ("Confidence" %in% names(metadata)) {
+    metadata$EvidenceAdjustedConfidence <- metadata$Confidence
+  }
   cbind(metadata, feature_df[setdiff(names(feature_df), "Cluster")])
+}
+
+add_training_domain_metadata <- function(x,
+                                         results_path = file.path("results", "benchmark_results_full.csv")) {
+  if (!is.data.frame(x) || nrow(x) == 0 || !"Dataset" %in% names(x)) {
+    return(x)
+  }
+
+  if (!"Tissue" %in% names(x)) {
+    x$Tissue <- NA_character_
+  }
+  if (!"Species" %in% names(x)) {
+    x$Species <- NA_character_
+  }
+
+  if (file.exists(results_path)) {
+    meta <- tryCatch(
+      utils::read.csv(results_path, stringsAsFactors = FALSE),
+      error = function(e) data.frame()
+    )
+    if (nrow(meta) > 0 && all(c("Dataset", "Tissue", "Species") %in% names(meta))) {
+      meta <- unique(meta[c("Dataset", "Tissue", "Species")])
+      idx <- match(x$Dataset, meta$Dataset)
+      missing_tissue <- is.na(x$Tissue) | !nzchar(as.character(x$Tissue))
+      missing_species <- is.na(x$Species) | !nzchar(as.character(x$Species))
+      x$Tissue[missing_tissue] <- meta$Tissue[idx[missing_tissue]]
+      x$Species[missing_species] <- meta$Species[idx[missing_species]]
+    }
+  }
+
+  missing_tissue <- is.na(x$Tissue) | !nzchar(as.character(x$Tissue))
+  x$Tissue[missing_tissue] <- infer_tissue_from_dataset(x$Dataset[missing_tissue])
+
+  missing_species <- is.na(x$Species) | !nzchar(as.character(x$Species))
+  x$Species[missing_species] <- ifelse(
+    grepl("Tasic|Zeisel", x$Dataset[missing_species], ignore.case = TRUE),
+    "Mouse",
+    "Human"
+  )
+
+  x
+}
+
+infer_tissue_from_dataset <- function(dataset) {
+  dataset <- as.character(dataset)
+  out <- rep("Unknown", length(dataset))
+  out[grepl("PBMC", dataset, ignore.case = TRUE)] <- "PBMC"
+  out[grepl("Pancreas|Baron|Muraro", dataset, ignore.case = TRUE)] <- "Pancreas"
+  out[grepl("Brain|Tasic|Zeisel", dataset, ignore.case = TRUE)] <- "Brain"
+  out[grepl("Lung|Zilionis", dataset, ignore.case = TRUE)] <- "Lung"
+  out
 }
 
 write_explainability_outputs <- function(model, features, output_rds) {

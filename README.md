@@ -175,6 +175,19 @@ risk_k <- select_refinement_candidates(
 For benchmark runs, set `DEEPSEEKCELL_RELIABILITY_MODEL` to the saved model RDS
 to add the compute-matched `DeepSeekCell-RiskK` arm.
 
+Assess whether the learned reliability model transfers across biological
+domains with the cross-tissue generalization workflow:
+
+```bash
+Rscript benchmarks/analyse_reliability_generalization.R results/benchmark_debug results/reliability_generalization first_pass_error 10
+```
+
+This analysis does not introduce another selector. It reuses the existing
+Risk-k model family to generate leave-one-tissue-out transfer results,
+single-tissue transfer matrices, learning curves, domain-shift summaries,
+oracle-gap analyses, calibration comparisons, and a failure taxonomy. The
+protocol is documented in `benchmarks/generalization_protocol.md`.
+
 For local development without network calls:
 
 ```r
