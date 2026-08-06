@@ -81,6 +81,83 @@ MARKER_PROFILE_ALIASES <- list(
   "lung endothelial cell" = c("endothelial cell of lung", "pulmonary endothelial cell")
 )
 
+RELIABILITY_SPEC_ID <- "DeepSeekCell reliability specification v1.0"
+RELIABILITY_SPEC_VERSION <- "1.0"
+RELIABILITY_SPEC_FROZEN_DATE <- "2026-08-06"
+RELIABILITY_PROMPT_VERSION <- "marker-json-candidate-v1"
+
+RELIABILITY_CONFIDENCE_WEIGHTS <- c(
+  llm_confidence = 0.35,
+  ontology_evidence = 0.25,
+  marker_evidence = 0.25,
+  tissue_evidence = 0.10,
+  consensus_evidence = 0.05
+)
+
+RELIABILITY_THRESHOLDS <- list(
+  unsupported_profile_best_score = 0.20,
+  unsupported_profile_marker_component = 0.50,
+  strong_marker_best_score = 0.50,
+  strong_marker_margin = 0.25,
+  strong_marker_floor = 0.10,
+  ontology_conflict_best_score = 0.60,
+  ontology_conflict_max_score = 0.45,
+  requires_refinement_best_score = 0.45,
+  mixed_profile_factor = 0.90
+)
+
+#' Get the frozen DeepSeekCell reliability specification
+#'
+#' Returns the named constants used by the frozen v1.0 reliability layer. The
+#' companion JSON file in `inst/extdata/reliability_spec_v1.0.json` records the
+#' same values together with external-validation provenance.
+#'
+#' @param include_marker_profiles Include marker profiles and aliases.
+#' @return Named list describing the frozen reliability specification.
+#' @export
+get_reliability_spec <- function(include_marker_profiles = TRUE) {
+  spec <- list(
+    spec_id = RELIABILITY_SPEC_ID,
+    spec_version = RELIABILITY_SPEC_VERSION,
+    frozen_date = RELIABILITY_SPEC_FROZEN_DATE,
+    prompt_version = RELIABILITY_PROMPT_VERSION,
+    confidence_weights = as.list(RELIABILITY_CONFIDENCE_WEIGHTS),
+    thresholds = RELIABILITY_THRESHOLDS,
+    selector = list(
+      default_strategy = "evidence",
+      matched_budget_rule = paste(
+        "When no explicit budget is supplied, Evidence-k selects all clusters",
+        "with RequiresRefinement = TRUE; Random-k, Confidence-k, and",
+        "NoOntology-k use the same k within each dataset-replicate block."
+      ),
+      evidence_ranking_rule = paste(
+        "Rank RequiresRefinement clusters by descending EvidenceConflictScore;",
+        "ties are resolved by the input cluster order after first-pass parsing."
+      ),
+      confidence_ranking_rule = paste(
+        "Rank all clusters by ascending raw LLMConfidence; ties are resolved by",
+        "the input cluster order."
+      ),
+      random_ranking_rule = paste(
+        "Sample k clusters without replacement using the prespecified",
+        "replicate-level random seed."
+      ),
+      full_refinement_rule = "Review every first-pass cluster."
+    ),
+    primary_endpoint = paste(
+      "CorrectionEfficiency =",
+      "(WrongToCorrect - CorrectToWrong) / NRefined"
+    )
+  )
+
+  if (isTRUE(include_marker_profiles)) {
+    spec$marker_profiles <- MARKER_EVIDENCE_PROFILES
+    spec$marker_aliases <- MARKER_PROFILE_ALIASES
+  }
+
+  spec
+}
+
 #' Score annotation evidence for marker-driven cell type calls
 #'
 #' @param annotations Annotation data frame.
@@ -115,8 +192,9 @@ score_annotation_evidence <- function(annotations,
     llm_confidence <- as_confidence(row$Confidence %||% 0.5)
 
     marker_component <- marker_match$predicted_score
-    if (marker_match$best_score < 0.2) {
-      marker_component <- 0.5
+    if (marker_match$best_score <
+        RELIABILITY_THRESHOLDS$unsupported_profile_best_score) {
+      marker_component <- RELIABILITY_THRESHOLDS$unsupported_profile_marker_component
     }
 
     conflict <- .has_evidence_conflict(
@@ -129,14 +207,19 @@ score_annotation_evidence <- function(annotations,
     )
 
     consensus_score <- if (isTRUE(conflict)) 0.25 else 1
-    mixed_factor <- if (isTRUE(row$IsMixed %||% FALSE)) 0.9 else 1
+    mixed_factor <- if (isTRUE(row$IsMixed %||% FALSE)) {
+      RELIABILITY_THRESHOLDS$mixed_profile_factor
+    } else {
+      1
+    }
+    weights <- RELIABILITY_CONFIDENCE_WEIGHTS
 
     calibrated <- (
-      0.35 * llm_confidence +
-        0.25 * ontology_score +
-        0.25 * marker_component +
-        0.10 * tissue_score +
-        0.05 * consensus_score
+      weights[["llm_confidence"]] * llm_confidence +
+        weights[["ontology_evidence"]] * ontology_score +
+        weights[["marker_evidence"]] * marker_component +
+        weights[["tissue_evidence"]] * tissue_score +
+        weights[["consensus_evidence"]] * consensus_score
     ) * mixed_factor
 
     calibrated <- pmin(pmax(calibrated, 0), 1)
@@ -156,7 +239,9 @@ score_annotation_evidence <- function(annotations,
       EvidenceBestCellType = marker_match$best_cell_type,
       EvidenceMatchedMarkers = paste(marker_match$best_markers, collapse = ", "),
       EvidenceConflict = isTRUE(conflict),
-      RequiresRefinement = isTRUE(conflict) && marker_match$best_score >= 0.45,
+      RequiresRefinement = isTRUE(conflict) &&
+        marker_match$best_score >=
+          RELIABILITY_THRESHOLDS$requires_refinement_best_score,
       CalibratedConfidence = round(calibrated, 3),
       CalibrationDelta = round(calibrated - llm_confidence, 3),
       stringsAsFactors = FALSE
@@ -216,8 +301,9 @@ calibrate_annotation_confidence <- function(annotations,
 #'
 #' Selects which first-pass annotations should receive an optional second LLM
 #' pass. Evidence-k ranks clusters by deterministic marker/evidence conflict,
-#' Confidence-k ranks by low raw LLM confidence, Random-k samples a matched
-#' number of clusters, and Full selects every cluster.
+#' Risk-k ranks clusters by a learned reliability model, Confidence-k ranks by
+#' low raw LLM confidence, Random-k samples a matched number of clusters, and
+#' Full selects every cluster.
 #'
 #' @param annotations Annotation data frame, preferably with evidence columns
 #' produced by [calibrate_annotation_confidence()].
@@ -225,14 +311,18 @@ calibrate_annotation_confidence <- function(annotations,
 #' are absent, evidence scores are computed before selection.
 #' @param tissue Tissue context used if evidence scores must be computed.
 #' @param budget Maximum number of clusters to select. If `NULL`, Evidence-k
-#' selects all evidence-conflicted clusters; Confidence-k and Random-k use the
-#' number of evidence-conflicted clusters as their matched budget; Full selects
-#' all clusters.
-#' @param strategy One of `"evidence"`, `"confidence"`, `"random"`, `"full"`,
-#' or `"none"`.
+#' selects all evidence-conflicted clusters; Risk-k, Confidence-k and Random-k
+#' use the number of evidence-conflicted clusters as their matched budget; Full
+#' selects all clusters.
+#' @param strategy One of `"evidence"`, `"risk"`, `"confidence"`, `"random"`,
+#' `"full"`, or `"none"`.
 #' @param use_ontology_evidence Whether ontology evidence contributes when
 #' evidence scores must be computed.
 #' @param seed Optional random seed for Random-k selection.
+#' @param reliability_model Optional model from [train_reliability_model()] used
+#' by Risk-k selection. If omitted, annotations must already contain
+#' `PredictedReliabilityRisk`, `PredictedErrorRisk`, or
+#' `PredictedRefinementBenefit`.
 #' @return Selected annotation rows with `SelectionStrategy`, `SelectionScore`
 #' and `SelectionRank` columns.
 #' @export
@@ -242,13 +332,15 @@ select_refinement_candidates <- function(annotations,
                                          budget = NULL,
                                          strategy = c(
                                            "evidence",
+                                           "risk",
                                            "confidence",
                                            "random",
                                            "full",
                                            "none"
                                          ),
                                          use_ontology_evidence = TRUE,
-                                         seed = NULL) {
+                                         seed = NULL,
+                                         reliability_model = NULL) {
   strategy <- match.arg(strategy)
 
   if (!is.data.frame(annotations) || nrow(annotations) == 0) {
@@ -295,6 +387,7 @@ select_refinement_candidates <- function(annotations,
     budget <- switch(
       strategy,
       evidence = matched_budget,
+      risk = matched_budget,
       confidence = matched_budget,
       random = matched_budget,
       full = nrow(annotations),
@@ -317,6 +410,31 @@ select_refinement_candidates <- function(annotations,
     }
     score <- .evidence_conflict_score(annotations)
     ord <- candidate_idx[order(score[candidate_idx], decreasing = TRUE)]
+  } else if (identical(strategy, "risk")) {
+    risk <- annotations$PredictedReliabilityRisk %||%
+      annotations$PredictedErrorRisk %||%
+      annotations$PredictedRefinementBenefit %||%
+      NULL
+
+    if (is.null(risk)) {
+      if (is.null(reliability_model)) {
+        stop(
+          "Risk-k selection requires reliability_model or a predicted risk column.",
+          call. = FALSE
+        )
+      }
+      features <- extract_reliability_features(
+        annotations,
+        markers = markers,
+        tissue = tissue,
+        use_ontology_evidence = use_ontology_evidence
+      )
+      risk <- predict_reliability_risk(reliability_model, features)
+    }
+
+    score <- suppressWarnings(as.numeric(risk))
+    score[is.na(score)] <- 0
+    ord <- order(score, decreasing = TRUE)
   } else if (identical(strategy, "confidence")) {
     llm_confidence <- annotations$LLMConfidence %||% annotations$Confidence %||%
       rep(0.5, nrow(annotations))
@@ -550,13 +668,17 @@ create_refinement_prompt <- function(markers, annotations, tissue, species = "Hu
   }
 
   predicted_matches_best <- length(.match_profile_name(predicted_label, best_label)) > 0
-  strong_marker_disagreement <- best_score >= 0.5 &&
-    predicted_score <= max(0.1, best_score - 0.25) &&
+  strong_marker_disagreement <-
+    best_score >= RELIABILITY_THRESHOLDS$strong_marker_best_score &&
+    predicted_score <= max(
+      RELIABILITY_THRESHOLDS$strong_marker_floor,
+      best_score - RELIABILITY_THRESHOLDS$strong_marker_margin
+    ) &&
     !predicted_matches_best
 
   unsupported_ontology <- isTRUE(use_ontology_evidence) &&
-    best_score >= 0.6 &&
-    ontology_score < 0.45
+    best_score >= RELIABILITY_THRESHOLDS$ontology_conflict_best_score &&
+    ontology_score < RELIABILITY_THRESHOLDS$ontology_conflict_max_score
 
   isTRUE(strong_marker_disagreement || unsupported_ontology)
 }

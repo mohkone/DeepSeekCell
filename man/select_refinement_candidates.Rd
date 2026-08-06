@@ -9,9 +9,10 @@ select_refinement_candidates(
   markers = NULL,
   tissue = NULL,
   budget = NULL,
-  strategy = c("evidence", "confidence", "random", "full", "none"),
+  strategy = c("evidence", "risk", "confidence", "random", "full", "none"),
   use_ontology_evidence = TRUE,
-  seed = NULL
+  seed = NULL,
+  reliability_model = NULL
 )
 }
 \arguments{
@@ -24,17 +25,23 @@ are absent, evidence scores are computed before selection.}
 \item{tissue}{Tissue context used if evidence scores must be computed.}
 
 \item{budget}{Maximum number of clusters to select. If \code{NULL}, Evidence-k
-selects all evidence-conflicted clusters; Confidence-k and Random-k use the
-number of evidence-conflicted clusters as their matched budget; Full selects
-all clusters.}
+selects all evidence-conflicted clusters; Risk-k, Confidence-k and Random-k
+use the number of evidence-conflicted clusters as their matched budget; Full
+selects all clusters.}
 
-\item{strategy}{One of \code{"evidence"}, \code{"confidence"}, \code{"random"}, \code{"full"},
-or \code{"none"}.}
+\item{strategy}{One of \code{"evidence"}, \code{"risk"}, \code{"confidence"},
+\code{"random"}, \code{"full"}, or \code{"none"}.}
 
 \item{use_ontology_evidence}{Whether ontology evidence contributes when
 evidence scores must be computed.}
 
 \item{seed}{Optional random seed for Random-k selection.}
+
+\item{reliability_model}{Optional model from
+\code{\link[=train_reliability_model]{train_reliability_model()}} used by
+Risk-k selection. If omitted, annotations must already contain
+\code{PredictedReliabilityRisk}, \code{PredictedErrorRisk}, or
+\code{PredictedRefinementBenefit}.}
 }
 \value{
 Selected annotation rows with \code{SelectionStrategy}, \code{SelectionScore}
@@ -43,6 +50,7 @@ and \code{SelectionRank} columns.
 \description{
 Selects which first-pass annotations should receive an optional second LLM
 pass. Evidence-k ranks clusters by deterministic marker/evidence conflict,
-Confidence-k ranks by low raw LLM confidence, Random-k samples a matched
-number of clusters, and Full selects every cluster.
+Risk-k ranks clusters by a learned reliability model, Confidence-k ranks by
+low raw LLM confidence, Random-k samples a matched number of clusters, and Full
+selects every cluster.
 }

@@ -1,0 +1,154 @@
+{
+  "spec_id": "DeepSeekCell reliability specification v1.0",
+  "spec_version": "1.0",
+  "frozen_date": "2026-08-06",
+  "prompt_version": "marker-json-candidate-v1",
+  "confidence_weights": {
+    "llm_confidence": 0.35,
+    "ontology_evidence": 0.25,
+    "marker_evidence": 0.25,
+    "tissue_evidence": 0.1,
+    "consensus_evidence": 0.05
+  },
+  "thresholds": {
+    "unsupported_profile_best_score": 0.2,
+    "unsupported_profile_marker_component": 0.5,
+    "strong_marker_best_score": 0.5,
+    "strong_marker_margin": 0.25,
+    "strong_marker_floor": 0.1,
+    "ontology_conflict_best_score": 0.6,
+    "ontology_conflict_max_score": 0.45,
+    "requires_refinement_best_score": 0.45,
+    "mixed_profile_factor": 0.9
+  },
+  "selector": {
+    "default_strategy": "evidence",
+    "matched_budget_rule": "When no explicit budget is supplied, Evidence-k selects all clusters with RequiresRefinement = TRUE; Random-k, Confidence-k, and NoOntology-k use the same k within each dataset-replicate block.",
+    "evidence_ranking_rule": "Rank RequiresRefinement clusters by descending EvidenceConflictScore; ties are resolved by the input cluster order after first-pass parsing.",
+    "confidence_ranking_rule": "Rank all clusters by ascending raw LLMConfidence; ties are resolved by the input cluster order.",
+    "random_ranking_rule": "Sample k clusters without replacement using the prespecified replicate-level random seed.",
+    "full_refinement_rule": "Review every first-pass cluster."
+  },
+  "primary_endpoint": "CorrectionEfficiency = (WrongToCorrect - CorrectToWrong) / NRefined",
+  "marker_profiles": {
+    "generic": {
+      "T cell": ["CD3D", "CD3E", "CD2", "TRAC", "TRBC1", "TRBC2"],
+      "CD4 T cell": ["CD3D", "CD3E", "CD4", "IL7R", "CCR7", "LTB"],
+      "CD8 T cell": ["CD3D", "CD3E", "CD8A", "CD8B", "GZMK", "NKG7"],
+      "B cell": ["MS4A1", "CD79A", "CD79B", "CD74", "BANK1", "CD19"],
+      "plasma cell": ["MZB1", "JCHAIN", "XBP1", "SDC1", "IGHG1", "IGKC"],
+      "natural killer cell": ["NKG7", "GNLY", "KLRD1", "KLRF1", "PRF1", "GZMB"],
+      "monocyte": ["LYZ", "LST1", "S100A8", "S100A9", "FCN1", "CTSS"],
+      "macrophage": ["C1QA", "C1QB", "C1QC", "CD68", "MARCO", "MRC1"],
+      "dendritic cell": ["FCER1A", "CLEC10A", "CD1C", "ITGAX", "LILRA4", "IRF8"],
+      "endothelial cell": ["PECAM1", "VWF", "KDR", "CLDN5", "FLT1", "EMCN"],
+      "fibroblast": ["COL1A1", "COL1A2", "DCN", "LUM", "PDGFRA", "THY1"],
+      "smooth muscle cell": ["ACTA2", "TAGLN", "MYH11", "CNN1", "MYL9", "TPM2"],
+      "pericyte": ["RGS5", "PDGFRB", "MCAM", "CSPG4", "ACTA2", "NOTCH3"],
+      "mast cell": ["TPSAB1", "TPSB2", "CPA3", "KIT", "MS4A2", "HDC"]
+    },
+    "pancreas": {
+      "alpha cell": ["GCG", "ARX", "SLC38A4", "TTR", "GC", "IRX2"],
+      "beta cell": ["INS", "IAPP", "MAFA", "PDX1", "NKX6-1", "SLC30A8"],
+      "delta cell": ["SST", "HHEX", "RBP4", "PCSK2", "LEPR", "RGS2"],
+      "gamma cell": ["PPY", "PNOC", "PAX6", "PCSK1", "CHGB"],
+      "epsilon cell": ["GHRL", "MLN", "PCSK1", "CHGA"],
+      "acinar cell": ["PRSS1", "CPA1", "CTRB1", "AMY2A", "CELA3A", "REG1A"],
+      "ductal cell": ["KRT19", "SOX9", "HNF1B", "TFF2", "MUC1", "SLC4A4"],
+      "pancreatic stellate cell": ["COL1A1", "COL3A1", "DCN", "LUM", "RGS5", "ACTA2"]
+    },
+    "brain": {
+      "neuron": ["SNAP25", "SYT1", "RBFOX3", "TUBB3", "MAP2", "STMN2"],
+      "glutamatergic neuron": ["SLC17A7", "SLC17A6", "CAMK2A", "SATB2", "TBR1"],
+      "GABAergic neuron": ["GAD1", "GAD2", "SLC32A1", "DLX1", "DLX2"],
+      "astrocyte": ["GFAP", "AQP4", "ALDH1L1", "SLC1A3", "GJA1", "S100B"],
+      "oligodendrocyte": ["MBP", "MOG", "PLP1", "MOBP", "MAG", "CLDN11"],
+      "oligodendrocyte precursor cell": ["PDGFRA", "CSPG4", "VCAN", "SOX10", "OLIG1", "OLIG2"],
+      "microglial cell": ["CX3CR1", "P2RY12", "TMEM119", "AIF1", "CSF1R", "TYROBP"],
+      "ependymal cell": ["FOXJ1", "PIFO", "TPPP3", "DNAH5", "CFAP43"]
+    },
+    "lung": {
+      "alveolar macrophage": ["MARCO", "PPARG", "FABP4", "MRC1", "C1QA", "C1QB"],
+      "AT1 cell": ["AGER", "PDPN", "CAV1", "HOPX", "RTKN2", "AQP5"],
+      "AT2 cell": ["SFTPC", "SFTPA1", "SFTPA2", "SFTPB", "ABCA3", "LAMP3"],
+      "club cell": ["SCGB1A1", "SCGB3A2", "CYP2F1", "BPIFB1", "MUC1"],
+      "ciliated cell": ["FOXJ1", "PIFO", "TPPP3", "DNAH5", "RSPH1", "CFAP43"],
+      "basal cell": ["KRT5", "KRT15", "TP63", "KRT17", "NGFR"],
+      "goblet cell": ["MUC5AC", "MUC5B", "SPDEF", "AGR2", "TFF3"],
+      "ionocyte": ["FOXI1", "CFTR", "ASCL3", "ATP6V1B1", "ATP6V0D2"],
+      "lung endothelial cell": ["PECAM1", "VWF", "CLDN5", "EMCN", "CA4", "RGCC"],
+      "lung fibroblast": ["COL1A1", "COL1A2", "DCN", "LUM", "PDGFRA", "COL3A1"]
+    },
+    "prostate": {
+      "prostate epithelial cell": ["KLK3", "KLK2", "MSMB", "ACPP", "KRT8", "KRT18"],
+      "basal epithelial cell": ["KRT5", "KRT14", "TP63", "KRT15", "DST"],
+      "luminal epithelial cell": ["KLK3", "KLK2", "NKX3-1", "KRT8", "KRT18", "MSMB"],
+      "lymphatic endothelial cell": ["PROX1", "LYVE1", "FLT4", "PDPN", "CCL21", "MMRN1"]
+    }
+  },
+  "marker_aliases": {
+    "T cell": ["t lymphocyte", "t-cell", "t cells"],
+    "CD4 T cell": ["cd4 positive alpha beta t cell", "cd4-positive t cell"],
+    "CD8 T cell": ["cd8 positive alpha beta t cell", "cytotoxic t cell"],
+    "B cell": ["b lymphocyte", "b-cell", "b cells"],
+    "natural killer cell": ["nk cell", "nk cells"],
+    "alpha cell": ["pancreatic alpha cell", "pancreatic a cell", "islet alpha cell"],
+    "beta cell": ["pancreatic beta cell", "type b pancreatic cell", "islet beta cell"],
+    "delta cell": ["pancreatic delta cell", "pancreatic d cell", "islet delta cell"],
+    "acinar cell": "pancreatic acinar cell",
+    "ductal cell": ["pancreatic ductal cell", "duct epithelial cell"],
+    "glutamatergic neuron": "excitatory neuron",
+    "GABAergic neuron": ["inhibitory neuron", "gabaergic interneuron"],
+    "oligodendrocyte precursor cell": ["opc", "ng2 cell", "ng2 glia"],
+    "microglial cell": "microglia",
+    "AT1 cell": ["alveolar type 1 cell", "type 1 pneumocyte", "ati cell"],
+    "AT2 cell": ["alveolar type 2 cell", "type 2 pneumocyte", "atii cell"],
+    "club cell": "clara cell",
+    "lung fibroblast": ["fibroblast of lung", "pulmonary interstitial fibroblast"],
+    "lung endothelial cell": ["endothelial cell of lung", "pulmonary endothelial cell"]
+  },
+  "software": {
+    "package": "DeepSeekCell",
+    "version": "0.1.0",
+    "commit_recorded_at_freeze": "704cf9203e9d",
+    "release_tag": "v0.1.0"
+  },
+  "ontology": {
+    "name": "Cell Ontology",
+    "local_path": "data/cl.obo",
+    "md5": "c3bc11c8df69911fd27671324e2adf7d",
+    "terms_reported_by_loader": 3437
+  },
+  "model_defaults": {
+    "deepseek": {
+      "model_id": "deepseek-chat",
+      "temperature": 0.1,
+      "max_tokens": 2000,
+      "api_url_env": "DEEPSEEK_API_URL",
+      "model_id_env": "DEEPSEEK_MODEL_ID"
+    },
+    "ollama": {
+      "model_id": "llama3.2:latest",
+      "temperature": 0.1,
+      "max_tokens": 2000,
+      "api_url_env": "OLLAMA_API_URL",
+      "model_id_env": "OLLAMA_MODEL_ID"
+    }
+  },
+  "development_benchmark": {
+    "datasets": ["PBMC", "BaronPancreas", "MuraroPancreas", "TasicBrain", "ZeiselBrain", "ZilionisLung"],
+    "role": "Development benchmark used before the locked external-validation protocol. Reliability specification v1.0 must not be changed after external validation begins."
+  },
+  "locked_external_validation": {
+    "primary_endpoint": "CorrectionEfficiency = (WrongToCorrect - CorrectToWrong) / NRefined",
+    "primary_hypothesis": "Evidence-k has higher correction efficiency than matched Confidence-k and Random-k on held-out dataset-replicate blocks.",
+    "paired_design": "Generate one first-pass response per model-dataset-replicate block, cache and hash it, and apply every selector to that exact response.",
+    "matched_controls": ["NoRefinement", "Random-k", "Confidence-k", "NoOntology-k", "Evidence-k", "FullRefined"],
+    "minimum_dataset_plan": ["independent immune dataset", "independent pancreas dataset", "independent neural dataset", "challenging disease or tumour dataset", "preferably one previously unseen tissue"]
+  },
+  "sensitivity_plan": {
+    "weight_sets": ["default", "equal", "no_ontology", "no_tissue", "marker_dominant", "llm_confidence_dominant", "simplex_random_500_to_1000"],
+    "threshold_grid": [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7],
+    "rule": "Sensitivity analyses are secondary robustness checks; do not select a new best configuration using held-out validation results."
+  }
+}

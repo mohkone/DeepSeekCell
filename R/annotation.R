@@ -18,14 +18,18 @@
 #' evidence-adjusted confidence while preserving LLMConfidence.
 #' @param self_refine Whether to run a selective second-pass refinement call.
 #' @param refinement_strategy Strategy for selecting refined clusters. Use
-#' `"evidence"` for Evidence-k, `"confidence"` for Confidence-k, `"random"` for
-#' Random-k, `"full"` for FullRefined, or `"none"` to disable selection.
+#' `"evidence"` for Evidence-k, `"risk"` for a learned Risk-k model,
+#' `"confidence"` for Confidence-k, `"random"` for Random-k, `"full"` for
+#' FullRefined, or `"none"` to disable selection.
 #' @param refinement_budget Maximum number of clusters to refine. If `NULL`,
-#' Evidence-k refines all evidence-conflicted clusters, Confidence-k and
-#' Random-k use the same matched budget, and FullRefined refines all clusters.
+#' Evidence-k refines all evidence-conflicted clusters, Risk-k, Confidence-k
+#' and Random-k use the same matched budget, and FullRefined refines all
+#' clusters.
 #' @param use_ontology_evidence Whether ontology mapping contributes to
 #' evidence-adjusted confidence and conflict detection.
 #' @param refinement_seed Optional random seed for Random-k selection.
+#' @param reliability_model Optional learned model returned by
+#' [train_reliability_model()] for Risk-k selection.
 #' @param return_prompt Whether to include the submitted prompt in the result.
 #' @return Comprehensive result object
 #' @export
@@ -43,6 +47,7 @@ annotate_cell_types <- function(markers,
                                 self_refine = FALSE,
                                 refinement_strategy = c(
                                   "evidence",
+                                  "risk",
                                   "confidence",
                                   "random",
                                   "full",
@@ -51,6 +56,7 @@ annotate_cell_types <- function(markers,
                                 refinement_budget = NULL,
                                 use_ontology_evidence = TRUE,
                                 refinement_seed = NULL,
+                                reliability_model = NULL,
                                 return_prompt = FALSE) {
   start_time <- Sys.time()
   refinement_strategy <- match.arg(refinement_strategy)
@@ -165,7 +171,8 @@ annotate_cell_types <- function(markers,
       preliminary_annotations,
       strategy = refinement_strategy,
       budget = refinement_budget,
-      seed = refinement_seed
+      seed = refinement_seed,
+      reliability_model = reliability_model
     )
     selected_clusters <- refinement_candidates$Cluster %||% character()
     selected_scores <- refinement_candidates$SelectionScore %||% numeric()
@@ -279,6 +286,7 @@ annotate_cell_types <- function(markers,
       self_refinement_enabled = isTRUE(self_refine),
       self_refinement_strategy = refinement_strategy,
       self_refinement_budget = refinement_budget,
+      reliability_model_id = reliability_model$model_id %||% NA_character_,
       self_refinement_flagged = refinement$n_flagged,
       self_refinement_attempted = isTRUE(refinement$attempted),
       self_refinement_updates = refinement$n_updated,

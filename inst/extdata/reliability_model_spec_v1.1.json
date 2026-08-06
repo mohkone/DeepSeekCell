@@ -1,0 +1,54 @@
+{
+  "model_id": "DeepSeekCell reliability model v1.1",
+  "model_version": "1.1",
+  "status": "trainable_extension_to_frozen_v1.0",
+  "purpose": "Learn a probability that a first-pass annotation is incorrect or will benefit from refinement, then allocate a fixed second-pass LLM budget to the highest-risk clusters.",
+  "optimization_objective": {
+    "definition": "S_star = argmax_{|S| <= k} sum_{i in S} E[Delta_i]",
+    "delta_i": "Expected annotation improvement after refinement for cluster i.",
+    "risk_k_approximation": "Rank clusters by predicted first-pass error risk or predicted refinement benefit and select the top k."
+  },
+  "default_model_type": "logistic_regression",
+  "supported_targets": [
+    "first_pass_error",
+    "refinement_benefit"
+  ],
+  "feature_columns": [
+    "LLMConfidence",
+    "OntologyEvidenceScore",
+    "MarkerEvidenceScore",
+    "BestMarkerEvidenceScore",
+    "TissueEvidenceScore",
+    "ConsensusEvidenceScore",
+    "EvidenceConflictScore",
+    "MarkerMargin",
+    "IsMixedNumeric",
+    "RequiresRefinementNumeric",
+    "CandidateCount",
+    "PredictedMatchesEvidenceBest",
+    "PredictedInCandidateSet",
+    "EvidenceBestInCandidateSet",
+    "CandidateEvidenceDisagreement",
+    "CandidateAgreementScore"
+  ],
+  "selector": {
+    "name": "Risk-k",
+    "ranking_rule": "Select the k clusters with the highest predicted risk or refinement-benefit probability.",
+    "budget_rule": "Use the same per-dataset-replicate refinement budget as Evidence-k unless an explicit budget is prespecified.",
+    "tie_breaking_rule": "Ties are resolved by input cluster order after first-pass parsing."
+  },
+  "training_protocol": {
+    "training_data_role": "development benchmark only",
+    "default_training_script": "benchmarks/train_reliability_model.R",
+    "input_source": "paired benchmark debug files with cached first-pass responses and FullRefined outcomes when available",
+    "output_model": "results/reliability_model_v1.1_error.rds or results/reliability_model_v1.1_benefit.rds",
+    "leakage_rule": "Do not train or tune on held-out external-validation datasets."
+  },
+  "external_validation_rule": "Freeze the trained model RDS and its MD5 hash before running held-out external validation.",
+  "primary_comparisons": [
+    "Risk-k versus Evidence-k",
+    "Risk-k versus Confidence-k",
+    "Risk-k versus Random-k"
+  ],
+  "primary_endpoint": "CorrectionEfficiency = (WrongToCorrect - CorrectToWrong) / NRefined"
+}

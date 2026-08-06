@@ -12,7 +12,8 @@ quick_annotate(
   species = "Human",
   self_refine = FALSE,
   refinement_strategy = "evidence",
-  refinement_budget = NULL
+  refinement_budget = NULL,
+  reliability_model = NULL
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ quick_annotate(
 \item{refinement_strategy}{Refinement selector strategy.}
 
 \item{refinement_budget}{Optional maximum number of clusters to refine.}
+
+\item{reliability_model}{Optional learned reliability model for Risk-k.}
 }
 \value{
 Annotation result object

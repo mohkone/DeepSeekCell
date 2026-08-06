@@ -1,0 +1,45 @@
+"spec_id","tissue_scope","canonical_cell_type","positive_markers","aliases","source_class","developed_on","date_frozen","frozen_before_external_validation"
+"DeepSeekCell reliability specification v1.0","generic","T cell","CD3D;CD3E;CD2;TRAC;TRBC1;TRBC2","t lymphocyte;t-cell;t cells","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","CD4 T cell","CD3D;CD3E;CD4;IL7R;CCR7;LTB","cd4 positive alpha beta t cell;cd4-positive t cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","CD8 T cell","CD3D;CD3E;CD8A;CD8B;GZMK;NKG7","cd8 positive alpha beta t cell;cytotoxic t cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","B cell","MS4A1;CD79A;CD79B;CD74;BANK1;CD19","b lymphocyte;b-cell;b cells","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","plasma cell","MZB1;JCHAIN;XBP1;SDC1;IGHG1;IGKC","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","natural killer cell","NKG7;GNLY;KLRD1;KLRF1;PRF1;GZMB","nk cell;nk cells","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","monocyte","LYZ;LST1;S100A8;S100A9;FCN1;CTSS","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","macrophage","C1QA;C1QB;C1QC;CD68;MARCO;MRC1","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","dendritic cell","FCER1A;CLEC10A;CD1C;ITGAX;LILRA4;IRF8","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","endothelial cell","PECAM1;VWF;KDR;CLDN5;FLT1;EMCN","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","fibroblast","COL1A1;COL1A2;DCN;LUM;PDGFRA;THY1","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","smooth muscle cell","ACTA2;TAGLN;MYH11;CNN1;MYL9;TPM2","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","pericyte","RGS5;PDGFRB;MCAM;CSPG4;ACTA2;NOTCH3","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","generic","mast cell","TPSAB1;TPSB2;CPA3;KIT;MS4A2;HDC","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","pancreas","alpha cell","GCG;ARX;SLC38A4;TTR;GC;IRX2","pancreatic alpha cell;pancreatic a cell;islet alpha cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","pancreas","beta cell","INS;IAPP;MAFA;PDX1;NKX6-1;SLC30A8","pancreatic beta cell;type b pancreatic cell;islet beta cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","pancreas","delta cell","SST;HHEX;RBP4;PCSK2;LEPR;RGS2","pancreatic delta cell;pancreatic d cell;islet delta cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","pancreas","gamma cell","PPY;PNOC;PAX6;PCSK1;CHGB","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","pancreas","epsilon cell","GHRL;MLN;PCSK1;CHGA","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","pancreas","acinar cell","PRSS1;CPA1;CTRB1;AMY2A;CELA3A;REG1A","pancreatic acinar cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","pancreas","ductal cell","KRT19;SOX9;HNF1B;TFF2;MUC1;SLC4A4","pancreatic ductal cell;duct epithelial cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","pancreas","pancreatic stellate cell","COL1A1;COL3A1;DCN;LUM;RGS5;ACTA2","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","brain","neuron","SNAP25;SYT1;RBFOX3;TUBB3;MAP2;STMN2","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","brain","glutamatergic neuron","SLC17A7;SLC17A6;CAMK2A;SATB2;TBR1","excitatory neuron","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","brain","GABAergic neuron","GAD1;GAD2;SLC32A1;DLX1;DLX2","inhibitory neuron;gabaergic interneuron","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","brain","astrocyte","GFAP;AQP4;ALDH1L1;SLC1A3;GJA1;S100B","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","brain","oligodendrocyte","MBP;MOG;PLP1;MOBP;MAG;CLDN11","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","brain","oligodendrocyte precursor cell","PDGFRA;CSPG4;VCAN;SOX10;OLIG1;OLIG2","opc;ng2 cell;ng2 glia","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","brain","microglial cell","CX3CR1;P2RY12;TMEM119;AIF1;CSF1R;TYROBP","microglia","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","brain","ependymal cell","FOXJ1;PIFO;TPPP3;DNAH5;CFAP43","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","alveolar macrophage","MARCO;PPARG;FABP4;MRC1;C1QA;C1QB","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","AT1 cell","AGER;PDPN;CAV1;HOPX;RTKN2;AQP5","alveolar type 1 cell;type 1 pneumocyte;ati cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","AT2 cell","SFTPC;SFTPA1;SFTPA2;SFTPB;ABCA3;LAMP3","alveolar type 2 cell;type 2 pneumocyte;atii cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","club cell","SCGB1A1;SCGB3A2;CYP2F1;BPIFB1;MUC1","clara cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","ciliated cell","FOXJ1;PIFO;TPPP3;DNAH5;RSPH1;CFAP43","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","basal cell","KRT5;KRT15;TP63;KRT17;NGFR","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","goblet cell","MUC5AC;MUC5B;SPDEF;AGR2;TFF3","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","ionocyte","FOXI1;CFTR;ASCL3;ATP6V1B1;ATP6V0D2","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","lung endothelial cell","PECAM1;VWF;CLDN5;EMCN;CA4;RGCC","endothelial cell of lung;pulmonary endothelial cell","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","lung","lung fibroblast","COL1A1;COL1A2;DCN;LUM;PDGFRA;COL3A1","fibroblast of lung;pulmonary interstitial fibroblast","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","prostate","prostate epithelial cell","KLK3;KLK2;MSMB;ACPP;KRT8;KRT18","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","prostate","basal epithelial cell","KRT5;KRT14;TP63;KRT15;DST","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","prostate","luminal epithelial cell","KLK3;KLK2;NKX3-1;KRT8;KRT18;MSMB","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE
+"DeepSeekCell reliability specification v1.0","prostate","lymphatic endothelial cell","PROX1;LYVE1;FLT4;PDPN;CCL21;MMRN1","","manual_curated_frozen_v1.0","development benchmark only","2026-08-06",TRUE

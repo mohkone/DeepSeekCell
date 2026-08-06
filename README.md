@@ -7,11 +7,14 @@ and resource-allocation problem. A first-pass LLM generates structured
 candidate labels from cluster marker genes. Deterministic marker, ontology, and
 tissue evidence are then used to score reliability, detect biological conflict,
 adjust confidence, and selectively allocate a limited second-pass refinement
-budget to the clusters most likely to benefit.
+budget. The learned Risk-k extension trains a reliability model to estimate
+first-pass error risk or expected refinement benefit and ranks clusters under
+the same fixed-budget objective.
 
 The software still includes DeepSeek and local Ollama backends plus a Shiny
-interface, but the main contribution is the model-agnostic Evidence-k
-refinement strategy rather than any single LLM or interface.
+interface, but the main contribution is the model-agnostic formulation of
+selective LLM refinement as a reliability and resource-allocation problem
+rather than any single LLM or interface.
 
 Current software version: `0.1.0`.
 
@@ -31,7 +34,8 @@ clusters manually. DeepSeekCell addresses the fixed-budget question:
 - Cell Ontology validation with exact, synonym, context-aware, and conservative fuzzy matching provenance.
 - Tissue-consistency and marker-prediction consensus scoring.
 - Evidence-adjusted confidence while preserving the original `LLMConfidence`.
-- Fixed-budget refinement selectors: Evidence-k, Confidence-k, Random-k, Full, and None.
+- Frozen fixed-budget selectors: Evidence-k, Confidence-k, Random-k, NoOntology-k, Full, and None.
+- Learned Risk-k selector using logistic error-risk or refinement-benefit models.
 - Refinement provenance columns for first-pass labels, flagging, refinement, label changes, and reasons.
 - Benchmark scripts for paired cached ablations, calibration metrics, selector efficiency, cost, and comparisons against SingleR, scType, scmap, and native CellTypist.
 
@@ -43,7 +47,7 @@ Marker genes
   -> marker / ontology / tissue evidence scoring
   -> conflict detection
   -> evidence-adjusted confidence
-  -> fixed-budget refinement selection
+  -> fixed-budget refinement selection (Evidence-k or learned Risk-k)
   -> optional second-pass reasoning
   -> final annotation with provenance
 ```
@@ -140,6 +144,28 @@ confidence_k <- select_refinement_candidates(
 )
 ```
 
+Train a learned Risk-k selector from paired benchmark debug files:
+
+```bash
+Rscript benchmarks/train_reliability_model.R results/benchmark_debug results/reliability_model_v1.1_error.rds first_pass_error
+```
+
+Then use it for risk-aware selection:
+
+```r
+model <- readRDS("results/reliability_model_v1.1_error.rds")
+
+risk_k <- select_refinement_candidates(
+  scored,
+  strategy = "risk",
+  budget = 3,
+  reliability_model = model
+)
+```
+
+For benchmark runs, set `DEEPSEEKCELL_RELIABILITY_MODEL` to the saved model RDS
+to add the compute-matched `DeepSeekCell-RiskK` arm.
+
 For local development without network calls:
 
 ```r
@@ -185,6 +211,65 @@ stability, runtime, cost, token, and statistical summaries including
 `benchmark_pairwise_wilcoxon.csv`, `benchmark_friedman_tests.csv`,
 `ablation_confidence_quality.csv`, `ablation_refinement_behavior.csv`,
 `refinement_efficiency_summary.csv`, and `benchmark_llm_stability.csv`.
+
+### Locked external validation
+
+The reliability layer is frozen as
+`DeepSeekCell reliability specification v1.0`. The machine-readable lock file
+and marker audit tables are distributed with the package:
+
+- `inst/extdata/reliability_spec_v1.0.json`
+- `inst/extdata/marker_profiles_v1.0.csv`
+- `inst/extdata/marker_aliases_v1.0.csv`
+
+The frozen specification records the evidence-score weights, marker profiles,
+aliases, conflict thresholds, selector rules, Cell Ontology MD5 hash, prompt
+version, software version, model defaults, and primary external-validation
+endpoint. It can also be inspected from R:
+
+```r
+get_reliability_spec(include_marker_profiles = FALSE)
+```
+
+The learned Risk-k extension is specified in
+`inst/extdata/reliability_model_spec_v1.1.json` and described in
+`benchmarks/risk_model_protocol.md`. Train it on development benchmark outputs,
+freeze the saved RDS, and set `DEEPSEEKCELL_RELIABILITY_MODEL` before held-out
+validation.
+
+Use `benchmarks/external_validation_protocol.md` as the locked held-out
+validation plan. Copy `benchmarks/external_validation_manifest_template.csv` to
+`benchmarks/external_validation_manifest.csv`, fill in genuinely held-out
+datasets, and run a preflight check:
+
+```bash
+Rscript benchmarks/run_external_validation.R benchmarks/external_validation_manifest.csv 1
+```
+
+The preflight writes `results/external_validation_lock.json` and
+`results/external_validation_plan.csv` without calling an LLM. To execute the
+locked validation after the prepared RDS paths are available:
+
+```bash
+set DEEPSEEKCELL_RUN_EXTERNAL_VALIDATION=true
+set DEEPSEEKCELL_RELIABILITY_MODEL=results/reliability_model_v1.1_error.rds
+Rscript benchmarks/run_external_validation.R benchmarks/external_validation_manifest.csv 3 deepseek
+```
+
+Each prepared external RDS should contain a named marker list `markers`, a named
+truth vector `truth`, and optional `tissue`, `species`, and `purity` fields. The
+runner preserves the paired design: one hashed first-pass response per
+model-dataset-replicate block is reused by all selectors.
+
+Secondary robustness checks can be run with:
+
+```bash
+Rscript benchmarks/sensitivity_analysis.R cluster_level_input.csv results/sensitivity
+```
+
+When no input is supplied, the script writes
+`results/sensitivity_input_schema.csv` describing the expected cluster-level
+columns.
 
 ### Fresh-clone benchmark workflow
 

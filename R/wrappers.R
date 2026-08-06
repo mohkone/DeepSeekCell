@@ -12,6 +12,7 @@
 #' @param self_refine Whether to run selective second-pass refinement.
 #' @param refinement_strategy Refinement selector strategy.
 #' @param refinement_budget Optional maximum number of clusters to refine.
+#' @param reliability_model Optional learned reliability model for Risk-k.
 #' @return Annotation result object
 #' @export
 quick_annotate <- function(markers,
@@ -21,7 +22,8 @@ quick_annotate <- function(markers,
                            species = "Human",
                            self_refine = FALSE,
                            refinement_strategy = "evidence",
-                           refinement_budget = NULL) {
+                           refinement_budget = NULL,
+                           reliability_model = NULL) {
   
   # Convert single vector to list
   if (is.character(markers) && !is.list(markers)) {
@@ -50,7 +52,8 @@ quick_annotate <- function(markers,
     validate = TRUE,
     self_refine = self_refine,
     refinement_strategy = refinement_strategy,
-    refinement_budget = refinement_budget
+    refinement_budget = refinement_budget,
+    reliability_model = reliability_model
   )
 }
 

@@ -264,6 +264,80 @@ test_that("fixed-budget selector supports evidence, confidence, and full strateg
   expect_equal(nrow(full), 3)
 })
 
+test_that("frozen reliability specification is available and matches code constants", {
+  spec <- get_reliability_spec(include_marker_profiles = FALSE)
+
+  expect_equal(spec$spec_id, "DeepSeekCell reliability specification v1.0")
+  expect_equal(spec$spec_version, "1.0")
+  expect_equal(sum(unlist(spec$confidence_weights)), 1)
+  expect_equal(spec$thresholds$requires_refinement_best_score, 0.45)
+  expect_equal(spec$thresholds$strong_marker_best_score, 0.50)
+
+  spec_path <- system.file(
+    "extdata",
+    "reliability_spec_v1.0.json",
+    package = "DeepSeekCell"
+  )
+  if (!nzchar(spec_path)) {
+    spec_path <- file.path("inst", "extdata", "reliability_spec_v1.0.json")
+  }
+
+  expect_true(file.exists(spec_path))
+  json_spec <- jsonlite::read_json(spec_path, simplifyVector = TRUE)
+  expect_equal(json_spec$spec_id, spec$spec_id)
+  expect_equal(
+    as.numeric(json_spec$confidence_weights),
+    as.numeric(unlist(spec$confidence_weights)),
+    tolerance = 1e-12
+  )
+})
+
+test_that("learned reliability model supports risk-aware selection", {
+  clusters <- paste0("Cluster", seq_len(24))
+  annotations <- data.frame(
+    Cluster = clusters,
+    CellType = c(rep("Macrophage", 12), rep("Beta cell", 12)),
+    Confidence = c(rep(0.95, 12), rep(0.70, 12)),
+    CandidateCellTypes = c(rep("Macrophage; beta cell", 12), rep("Beta cell; alpha cell", 12)),
+    IsMixed = FALSE,
+    TissueConsistency = "expected",
+    CL_ID = c(rep("CL:0000235", 12), rep("CL:0000169", 12)),
+    OntologyLabel = c(rep("macrophage", 12), rep("type B pancreatic cell", 12)),
+    MatchMethod = c(rep("exact", 12), rep("context_exact", 12)),
+    OntologyMatchScore = 1,
+    stringsAsFactors = FALSE
+  )
+  markers <- stats::setNames(
+    rep(list(c("INS", "IAPP", "MAFA", "PDX1")), length(clusters)),
+    clusters
+  )
+  truth <- stats::setNames(rep("Beta cell", length(clusters)), clusters)
+
+  features <- extract_reliability_features(
+    annotations,
+    markers = markers,
+    tissue = "Pancreas",
+    truth = truth
+  )
+  model <- train_reliability_model(features, target = "first_pass_error")
+  risk <- predict_reliability_risk(model, features)
+
+  expect_s3_class(model, "deepseekcell_reliability_model")
+  expect_gt(mean(risk[1:12]), mean(risk[13:24]))
+
+  scored <- calibrate_annotation_confidence(annotations, markers, tissue = "Pancreas")
+  selected <- select_refinement_candidates(
+    scored,
+    strategy = "risk",
+    budget = 3,
+    reliability_model = model
+  )
+
+  expect_equal(nrow(selected), 3)
+  expect_true(all(selected$Cluster %in% clusters[1:12]))
+  expect_equal(selected$SelectionStrategy, rep("risk", 3))
+})
+
 test_that("ontology-disabled evidence removes ontology-only conflict triggers", {
   annotations <- data.frame(
     Cluster = "Cluster1",

@@ -13,10 +13,10 @@ Description: Provides an evidence-guided reliability framework for
     marker-based large language model cell type annotation in single-cell RNA
     sequencing. The package converts cluster marker genes into structured
     candidate annotations, scores deterministic marker, ontology and tissue
-    evidence, computes evidence-adjusted confidence, selectively refines
-    high-conflict predictions under a fixed budget, maps labels to the Cell
-    Ontology, exports reports, and supports reproducible benchmarking against
-    established annotation methods.
+    evidence, computes evidence-adjusted confidence, trains transparent
+    reliability models for risk-aware selective refinement under a fixed
+    budget, maps labels to the Cell Ontology, exports reports, and supports
+    reproducible benchmarking against established annotation methods.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

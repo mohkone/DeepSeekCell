@@ -1,0 +1,159 @@
+# Locked External Validation Protocol
+
+This protocol defines the confirmatory validation of DeepSeekCell reliability
+specification v1.0. The goal is to test whether the frozen Evidence-k selector
+generalises to datasets that were not used to choose marker profiles, aliases,
+weights, thresholds, prompts, or refinement rules.
+
+## Frozen Method
+
+The locked method is identified as:
+
+`DeepSeekCell reliability specification v1.0`
+
+The machine-readable specification is stored in:
+
+`inst/extdata/reliability_spec_v1.0.json`
+
+The supplementary audit tables are:
+
+`inst/extdata/marker_profiles_v1.0.csv`
+
+`inst/extdata/marker_aliases_v1.0.csv`
+
+No marker profile, alias, weight, threshold, prompt rule, tie-breaking rule, or
+selector definition should be changed after external validation begins. Any
+later methodological change should be labelled as a new specification, for
+example v1.1, and evaluated separately.
+
+The learned extension is:
+
+`DeepSeekCell reliability model v1.1`
+
+Its machine-readable specification is stored in:
+
+`inst/extdata/reliability_model_spec_v1.1.json`
+
+Risk-k models must be trained only on development benchmark outputs and frozen
+as an RDS file before held-out validation. The external-validation lock file
+records the model path and MD5 hash when `DEEPSEEKCELL_RELIABILITY_MODEL` is set.
+
+## Development Benchmark
+
+The following datasets are treated as development datasets because they were
+used during method construction or internal benchmarking:
+
+- PBMC
+- BaronPancreas
+- MuraroPancreas
+- TasicBrain
+- ZeiselBrain
+- ZilionisLung
+
+Results on these datasets remain useful for comparison, ablation, debugging,
+and manuscript context, but they are not the primary evidence of locked-method
+generalisability.
+
+## Held-Out Dataset Requirements
+
+The confirmatory external set should include at least:
+
+- One independent immune dataset.
+- One independent pancreas dataset.
+- One independent neural dataset.
+- One challenging disease or tumour dataset.
+- Preferably one dataset from a previously unseen tissue.
+
+Datasets must be selected before running the locked analysis. The selection
+should be recorded in `benchmarks/external_validation_manifest.csv` using the
+template `benchmarks/external_validation_manifest_template.csv`.
+
+## Primary Endpoint
+
+The primary endpoint is correction efficiency under a matched refinement budget:
+
+```text
+CorrectionEfficiency = (WrongToCorrect - CorrectToWrong) / NRefined
+```
+
+The primary comparison for the learned method is Risk-k versus compute-matched
+Evidence-k, Random-k, and Confidence-k within each model-dataset-replicate
+block. If no trained Risk-k model is supplied, the deterministic v1.0 fallback
+comparison is Evidence-k versus Random-k and Confidence-k.
+
+Primary hypothesis:
+
+```text
+Risk-k achieves higher correction efficiency than compute-matched Evidence-k,
+Confidence-k and Random-k on held-out datasets.
+```
+
+## Secondary Endpoints
+
+Secondary outcomes include:
+
+- Wrong-to-correct revisions.
+- Correct-to-wrong revisions.
+- Error-recovery rate relative to FullRefined.
+- Selection precision, recall, specificity, negative predictive value, and MCC.
+- Final accuracy, macro-F1, balanced accuracy, ARI, and Cell Ontology clade accuracy.
+- Raw versus evidence-adjusted confidence quality: Brier score, binary correctness NLL, ECE, AUROC, and AURC.
+- Runtime, prompt tokens, completion tokens, total tokens, API cost, and cost per corrected error.
+
+## Paired Design
+
+For every model-dataset-replicate block:
+
+1. Generate exactly one first-pass LLM response.
+2. Cache and hash the raw response.
+3. Parse the cached response into first-pass annotations.
+4. Apply Plain, Evidence, Calibrated, Random-k, Confidence-k, NoOntology-k, Risk-k, Evidence-k/SelfRefined, and FullRefined to the same parsed response.
+5. Use the same refinement budget k for Random-k, Confidence-k, NoOntology-k, Risk-k, and Evidence-k.
+6. Record selected clusters, reviewed clusters, label changes, confidence changes, tokens, latency, cost, and response hashes.
+
+Do not independently call the first-pass LLM for different ablation arms.
+
+## Statistical Analysis
+
+Use dataset-replicate blocks as the primary paired unit. Report:
+
+- Bootstrap confidence intervals over dataset-replicate blocks.
+- Paired Wilcoxon signed-rank tests for Risk-k versus Evidence-k, Random-k and Confidence-k.
+- Effect sizes for paired differences.
+- False-discovery-rate correction for families of secondary tests.
+
+Replicate-level results should be interpreted as stability evidence, not as
+fully independent biological datasets.
+
+## Sensitivity Analyses
+
+Sensitivity analyses are secondary robustness checks and must not be used to
+select a new best configuration after inspecting held-out performance.
+
+Prespecified confidence-weight variants:
+
+- Default v1.0 weights.
+- Equal weights.
+- No ontology evidence.
+- No tissue evidence.
+- Marker-dominant weights.
+- LLM-confidence-dominant weights.
+- Random weight vectors sampled from the simplex.
+
+Prespecified threshold grid:
+
+```text
+tau = 0.25, 0.30, ..., 0.70
+```
+
+Report selector rank correlation, selected-cluster Jaccard overlap, correction
+efficiency, recovery rate, and correct-to-wrong revisions across the grid.
+
+## Reporting
+
+The manuscript should keep two questions separate:
+
+- Annotation-method comparison: SingleR, scType, native CellTypist, scmap, and LLM-based annotation methods.
+- Refinement-selector comparison: NoRefinement, Random-k, Confidence-k, NoOntology-k, Evidence-k, Risk-k, and FullRefined.
+
+SingleR and CellTypist are annotation methods, not refinement selectors.

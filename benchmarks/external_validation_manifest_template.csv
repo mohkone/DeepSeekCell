@@ -1,0 +1,6 @@
+Dataset,Tissue,Species,DataPath,PreparedRdsPath,GroundTruthColumn,ClusterColumn,MarkerSource,PreprocessingScript,IsDevelopmentDataset,IsUnseenTissue,SelectionRationale,Notes
+ExternalImmune,Immune system,Human,,,,,,,FALSE,FALSE,Independent immune validation dataset,
+ExternalPancreas,Pancreas,Human,,,,,,,FALSE,FALSE,Independent pancreas validation dataset,
+ExternalNeural,Brain,Human or Mouse,,,,,,,FALSE,FALSE,Independent neural validation dataset,
+ExternalDiseaseOrTumour,Disease or tumour,Human,,,,,,,FALSE,FALSE,Challenging disease or tumour validation dataset,
+ExternalUnseenTissue,Unseen tissue,Human or Mouse,,,,,,,FALSE,TRUE,Previously unseen tissue validation dataset,

@@ -13,6 +13,10 @@ source("benchmarks/methods.R")
 source("benchmarks/metrics.R")
 source("benchmarks/statistics.R")
 source("R/utils.R")
+source("R/ontology.R")
+source("R/ontology_loader.R")
+source("R/refinement.R")
+source("R/reliability_model.R")
 source("benchmarks/ablation.R")
 
 custom_mapping <- list(
@@ -340,7 +344,7 @@ uses_raw_llm_confidence <- function(arm_name) {
 }
 
 refinement_method_family <- function(method) {
-  sub("-(RandomK|ConfidenceK|NoOntologyK|SelfRefined|FullRefined)$", "", method)
+  sub("-(RandomK|ConfidenceK|NoOntologyK|RiskK|SelfRefined|FullRefined)$", "", method)
 }
 
 ablation_method_names <- function(method_prefix = "DeepSeek") {
@@ -357,6 +361,7 @@ ablation_method_names <- function(method_prefix = "DeepSeek") {
     random = paste0(cell_prefix, "-RandomK"),
     confidence = paste0(cell_prefix, "-ConfidenceK"),
     no_ontology = paste0(cell_prefix, "-NoOntologyK"),
+    risk = paste0(cell_prefix, "-RiskK"),
     self = paste0(cell_prefix, "-SelfRefined"),
     full = paste0(cell_prefix, "-FullRefined")
   )
@@ -453,6 +458,7 @@ evaluate_ablation_arm <- function(annotations,
     Method = arm_name,
     LLMBackend = llm_backend,
     LLMModelID = llm_model_id,
+    ReliabilityModelID = (annotations$ReliabilityModelID %||% NA_character_)[[1]],
     RefinementSelector = refinement_selector,
     RefinementBudgetK = refinement_budget_k,
     Cluster = names(pred),
@@ -463,6 +469,13 @@ evaluate_ablation_arm <- function(annotations,
     HarmonisedTruth = as.character(truth_h),
     LLMConfidence = annotations$LLMConfidence %||% annotations$Confidence,
     Confidence = annotations$Confidence,
+    CandidateCellTypes = annotations$CandidateCellTypes %||% NA_character_,
+    OntologyEvidenceScore = annotations$OntologyEvidenceScore %||% NA_real_,
+    MarkerEvidenceScore = annotations$MarkerEvidenceScore %||% NA_real_,
+    BestMarkerEvidenceScore = annotations$BestMarkerEvidenceScore %||% NA_real_,
+    TissueEvidenceScore = annotations$TissueEvidenceScore %||% NA_real_,
+    ConsensusEvidenceScore = annotations$ConsensusEvidenceScore %||% NA_real_,
+    EvidenceConflictScore = annotations$EvidenceConflictScore %||% NA_real_,
     EvidenceBestCellType = annotations$EvidenceBestCellType %||% NA_character_,
     EvidenceConflict = annotations$EvidenceConflict %||% NA,
     RequiresRefinement = annotations$RequiresRefinement %||% NA,
@@ -532,6 +545,7 @@ evaluate_ablation_arm <- function(annotations,
     Method = arm_name,
     LLMBackend = llm_backend,
     LLMModelID = llm_model_id,
+    ReliabilityModelID = (annotations$ReliabilityModelID %||% NA_character_)[[1]],
     RefinementSelector = refinement_selector,
     RefinementBudgetK = refinement_budget_k,
     NClusters = length(markers),
@@ -613,6 +627,26 @@ include_ollama_full_refinement <- function() {
   value %in% c("1", "true", "yes", "y")
 }
 
+load_benchmark_reliability_model <- function() {
+  path <- Sys.getenv("DEEPSEEKCELL_RELIABILITY_MODEL", unset = "")
+  if (!nzchar(path)) {
+    return(NULL)
+  }
+  if (!file.exists(path)) {
+    warning("DEEPSEEKCELL_RELIABILITY_MODEL does not exist: ", path)
+    return(NULL)
+  }
+  model <- tryCatch(readRDS(path), error = function(e) {
+    warning("Could not read reliability model: ", conditionMessage(e))
+    NULL
+  })
+  if (!inherits(model, "deepseekcell_reliability_model")) {
+    warning("DEEPSEEKCELL_RELIABILITY_MODEL is not a DeepSeekCell reliability model.")
+    return(NULL)
+  }
+  model
+}
+
 read_llm_response_cache <- function(cache_file) {
   if (!use_llm_response_cache() || !file.exists(cache_file)) {
     return(NULL)
@@ -625,7 +659,8 @@ select_refinement_clusters <- function(first_pass_evidence,
                                        selector,
                                        k,
                                        replicate,
-                                       dataset_name) {
+                                       dataset_name,
+                                       reliability_model = NULL) {
   clusters <- as.character(first_pass_evidence$Cluster)
   k <- suppressWarnings(as.integer(k %||% 0))
   if (length(k) == 0 || is.na(k)) {
@@ -700,6 +735,16 @@ select_refinement_clusters <- function(first_pass_evidence,
     confidence <- first_pass_evidence$LLMConfidence %||% first_pass_evidence$Confidence
     confidence <- as_confidence(confidence)
     ord <- order(confidence, decreasing = FALSE, na.last = TRUE)
+    return(clusters[head(ord, k)])
+  }
+
+  if (identical(selector, "risk-k")) {
+    if (is.null(reliability_model)) {
+      stop("risk-k requires a trained reliability model.", call. = FALSE)
+    }
+    features <- extract_reliability_features(first_pass_evidence)
+    risk <- predict_reliability_risk(reliability_model, features)
+    ord <- order(risk, decreasing = TRUE, na.last = TRUE)
     return(clusters[head(ord, k)])
   }
 
@@ -833,6 +878,7 @@ run_llm_ablation_wrapper <- function(dataset_name,
   species <- data$species
   model_id <- MODELS[[model_key]]$model_id %||% NA_character_
   method_names <- ablation_method_names(method_prefix)
+  reliability_model <- load_benchmark_reliability_model()
 
   first_pass_dir <- file.path("results", "benchmark_debug", "first_pass")
   first_pass_cache <- file.path(
@@ -935,6 +981,16 @@ run_llm_ablation_wrapper <- function(dataset_name,
     dataset_name = dataset_name
   )
   selector_clusters[[method_names$no_ontology]] <- no_ontology_clusters
+  if (!is.null(reliability_model)) {
+    selector_clusters[[method_names$risk]] <- select_refinement_clusters(
+      first_pass_evidence,
+      selector = "risk-k",
+      k = evidence_k,
+      replicate = replicate,
+      dataset_name = dataset_name,
+      reliability_model = reliability_model
+    )
+  }
   selector_clusters[[method_names$self]] <- evidence_clusters
   if (isTRUE(include_full_refinement)) {
     selector_clusters[[method_names$full]] <- select_refinement_clusters(
@@ -951,6 +1007,7 @@ run_llm_ablation_wrapper <- function(dataset_name,
       "random-k",
       "confidence-k",
       "evidence-no-ontology-k",
+      if (!is.null(reliability_model)) "risk-k" else character(),
       "evidence-k",
       if (isTRUE(include_full_refinement)) "full" else character()
     ),
@@ -958,6 +1015,7 @@ run_llm_ablation_wrapper <- function(dataset_name,
       method_names$random,
       method_names$confidence,
       method_names$no_ontology,
+      if (!is.null(reliability_model)) method_names$risk else character(),
       method_names$self,
       if (isTRUE(include_full_refinement)) method_names$full else character()
     )
@@ -1025,6 +1083,18 @@ run_llm_ablation_wrapper <- function(dataset_name,
     selected_clusters = refinement_runs[[method_names$no_ontology]]$selected_clusters,
     arm_name = method_names$no_ontology
   )
+  if (!is.null(reliability_model)) {
+    arms[[method_names$risk]] <- create_refined_ablation_arm(
+      first_pass_annotations = first_pass_annotations,
+      markers = markers,
+      tissue = tissue,
+      ontology_data = ont_data,
+      refined_annotations = refinement_runs[[method_names$risk]]$refined_annotations,
+      selected_clusters = refinement_runs[[method_names$risk]]$selected_clusters,
+      arm_name = method_names$risk
+    )
+    arms[[method_names$risk]]$ReliabilityModelID <- reliability_model$model_id %||% NA_character_
+  }
   if (isTRUE(include_full_refinement)) {
     arms[[method_names$full]] <- create_refined_ablation_arm(
       first_pass_annotations = first_pass_annotations,
