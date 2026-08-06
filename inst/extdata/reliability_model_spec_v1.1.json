@@ -42,6 +42,13 @@
     "default_training_script": "benchmarks/train_reliability_model.R",
     "input_source": "paired benchmark debug files with cached first-pass responses and FullRefined outcomes when available",
     "output_model": "results/reliability_model_v1.1_error.rds or results/reliability_model_v1.1_benefit.rds",
+    "required_explainability_outputs": [
+      "feature coefficients and odds ratios",
+      "linear SHAP-style per-cluster contributions",
+      "global contribution importance",
+      "risk calibration metrics and bins",
+      "feature-group ablation"
+    ],
     "leakage_rule": "Do not train or tune on held-out external-validation datasets."
   },
   "external_validation_rule": "Freeze the trained model RDS and its MD5 hash before running held-out external validation.",

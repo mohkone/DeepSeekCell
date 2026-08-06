@@ -150,6 +150,15 @@ Train a learned Risk-k selector from paired benchmark debug files:
 Rscript benchmarks/train_reliability_model.R results/benchmark_debug results/reliability_model_v1.1_error.rds first_pass_error
 ```
 
+Training writes explainability outputs beside the model, including feature
+importance, odds ratios, linear SHAP-style cluster contributions, calibration
+bins, calibration metrics, feature ablations, and PDF plots. Recompute those
+outputs for an existing model with:
+
+```bash
+Rscript benchmarks/explain_reliability_model.R results/reliability_model_v1.1_error.rds results/reliability_model_v1.1_error_training_features.csv
+```
+
 Then use it for risk-aware selection:
 
 ```r

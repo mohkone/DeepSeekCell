@@ -5,7 +5,8 @@
 train_reliability_model(
   features,
   target = c("first_pass_error", "refinement_benefit"),
-  target_column = NULL
+  target_column = NULL,
+  feature_columns = RELIABILITY_MODEL_FEATURES
 )
 }
 \arguments{
@@ -16,6 +17,8 @@ or another table containing the required numeric feature columns.}
 \code{"refinement_benefit"}.}
 
 \item{target_column}{Optional explicit binary target column.}
+
+\item{feature_columns}{Numeric feature columns used to train the model.}
 }
 \value{
 Object of class \code{deepseekcell_reliability_model}.

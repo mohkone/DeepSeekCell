@@ -91,15 +91,63 @@ The default implementation uses logistic regression for interpretability and
 minimal dependency burden. More flexible learners can be evaluated later, but
 they should be labelled as separate model variants.
 
+## Explainable Reliability Analysis
+
+Every trained Risk-k model should be accompanied by:
+
+- Logistic coefficients.
+- Standardized coefficients.
+- Odds ratios and Wald confidence intervals.
+- Linear SHAP-style per-cluster log-odds contributions.
+- Global mean absolute contribution importance.
+- Calibration metrics and equal-frequency calibration bins.
+- Feature-group ablation results.
+
+The training script writes these outputs automatically:
+
+```text
+*_feature_importance.csv
+*_global_contributions.csv
+*_cluster_contributions.csv
+*_calibration_metrics.csv
+*_calibration_bins.csv
+*_feature_ablation.csv
+*_feature_importance.pdf
+*_contribution_importance.pdf
+*_calibration_curve.pdf
+```
+
+For logistic regression, the SHAP-style contribution for feature `j` in cluster
+`i` is defined as:
+
+```text
+phi_ij = beta_j * (x_ij - mean_j)
+```
+
+This is reported on the log-odds scale and indicates how much each feature
+moves the prediction away from the training-set baseline risk. The manuscript
+should use this analysis to answer why Risk-k selected a cluster, for example:
+
+```text
+High predicted risk was driven primarily by high evidence conflict and low
+marker support rather than by low raw LLM confidence.
+```
+
+Feature ablation should be interpreted as a robustness analysis, not as a new
+selector. The planned ablations remove LLM confidence, ontology evidence,
+marker evidence, tissue evidence, consensus evidence, and candidate-label
+features one group at a time.
+
 ## Locked Evaluation
 
 Before held-out validation:
 
 1. Train the model on development benchmark outputs only.
 2. Save the model RDS.
-3. Record the model MD5 hash.
-4. Set `DEEPSEEKCELL_RELIABILITY_MODEL` to the model path.
-5. Run external validation without retraining or retuning.
+3. Generate and archive the explainability outputs.
+4. Record the model MD5 hash.
+5. Set `DEEPSEEKCELL_RELIABILITY_MODEL` to the model path.
+6. Run external validation without retraining or retuning.
 
 ```bash
 set DEEPSEEKCELL_RELIABILITY_MODEL=results/reliability_model_v1.1_error.rds

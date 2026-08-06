@@ -321,9 +321,31 @@ test_that("learned reliability model supports risk-aware selection", {
   )
   model <- train_reliability_model(features, target = "first_pass_error")
   risk <- predict_reliability_risk(model, features)
+  importance <- explain_reliability_model(model)
+  contributions <- compute_reliability_contributions(model, features)
+  global_importance <- summarise_reliability_contributions(contributions)
+  calibration <- evaluate_reliability_calibration(
+    model,
+    features,
+    target = "first_pass_error",
+    n_bins = 4
+  )
+  ablation <- run_reliability_feature_ablation(
+    training_features = features,
+    evaluation_features = features,
+    target = "first_pass_error"
+  )
 
   expect_s3_class(model, "deepseekcell_reliability_model")
   expect_gt(mean(risk[1:12]), mean(risk[13:24]))
+  expect_true(all(c(
+    "Feature", "OddsRatio", "StandardizedCoefficient"
+  ) %in% names(importance)))
+  expect_true(nrow(contributions) >= nrow(features))
+  expect_true(nrow(global_importance) > 0)
+  expect_true(all(c("Brier", "ECE", "CalibrationSlope") %in% names(calibration$metrics)))
+  expect_equal(sum(calibration$bins$N), nrow(features))
+  expect_true("full" %in% ablation$Variant)
 
   scored <- calibrate_annotation_confidence(annotations, markers, tissue = "Pancreas")
   selected <- select_refinement_candidates(

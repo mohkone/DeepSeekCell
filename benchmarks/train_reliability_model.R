@@ -101,6 +101,133 @@ build_training_features <- function(debug_dir = file.path("results", "benchmark_
   cbind(metadata, feature_df[setdiff(names(feature_df), "Cluster")])
 }
 
+write_explainability_outputs <- function(model, features, output_rds) {
+  prefix <- sub("\\.rds$", "", output_rds, ignore.case = TRUE)
+
+  importance <- explain_reliability_model(model)
+  contributions <- compute_reliability_contributions(model, features)
+  global_contributions <- summarise_reliability_contributions(contributions)
+  calibration <- evaluate_reliability_calibration(
+    model,
+    features,
+    target = model$target %||% "first_pass_error"
+  )
+  ablation <- run_reliability_feature_ablation(
+    training_features = features,
+    evaluation_features = features,
+    target = model$target %||% "first_pass_error"
+  )
+
+  utils::write.csv(
+    importance,
+    paste0(prefix, "_feature_importance.csv"),
+    row.names = FALSE
+  )
+  utils::write.csv(
+    global_contributions,
+    paste0(prefix, "_global_contributions.csv"),
+    row.names = FALSE
+  )
+  utils::write.csv(
+    contributions,
+    paste0(prefix, "_cluster_contributions.csv"),
+    row.names = FALSE
+  )
+  utils::write.csv(
+    calibration$metrics,
+    paste0(prefix, "_calibration_metrics.csv"),
+    row.names = FALSE
+  )
+  utils::write.csv(
+    calibration$bins,
+    paste0(prefix, "_calibration_bins.csv"),
+    row.names = FALSE
+  )
+  utils::write.csv(
+    ablation,
+    paste0(prefix, "_feature_ablation.csv"),
+    row.names = FALSE
+  )
+
+  write_explainability_plots(
+    importance,
+    global_contributions,
+    calibration$bins,
+    prefix
+  )
+}
+
+write_explainability_plots <- function(importance,
+                                       global_contributions,
+                                       calibration_bins,
+                                       prefix) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    return(invisible(FALSE))
+  }
+
+  if (nrow(importance) > 0) {
+    plot_df <- importance[order(abs(importance$StandardizedCoefficient)), , drop = FALSE]
+    p <- ggplot2::ggplot(
+      plot_df,
+      ggplot2::aes(
+        x = stats::reorder(.data$Feature, .data$StandardizedCoefficient),
+        y = .data$StandardizedCoefficient,
+        fill = .data$StandardizedCoefficient > 0
+      )
+    ) +
+      ggplot2::geom_col(show.legend = FALSE) +
+      ggplot2::coord_flip() +
+      ggplot2::labs(
+        x = NULL,
+        y = "Standardized logistic coefficient",
+        title = "Risk-k feature importance"
+      ) +
+      ggplot2::theme_minimal(base_size = 11)
+    ggplot2::ggsave(paste0(prefix, "_feature_importance.pdf"), p, width = 7, height = 5)
+  }
+
+  if (nrow(global_contributions) > 0) {
+    plot_df <- global_contributions[order(global_contributions$MeanAbsContribution), , drop = FALSE]
+    p <- ggplot2::ggplot(
+      plot_df,
+      ggplot2::aes(
+        x = stats::reorder(.data$Feature, .data$MeanAbsContribution),
+        y = .data$MeanAbsContribution
+      )
+    ) +
+      ggplot2::geom_col(fill = "#2C7FB8") +
+      ggplot2::coord_flip() +
+      ggplot2::labs(
+        x = NULL,
+        y = "Mean absolute log-odds contribution",
+        title = "Global linear SHAP-style importance"
+      ) +
+      ggplot2::theme_minimal(base_size = 11)
+    ggplot2::ggsave(paste0(prefix, "_contribution_importance.pdf"), p, width = 7, height = 5)
+  }
+
+  if (nrow(calibration_bins) > 0) {
+    p <- ggplot2::ggplot(
+      calibration_bins,
+      ggplot2::aes(x = .data$MeanPredictedRisk, y = .data$ObservedEventRate)
+    ) +
+      ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+      ggplot2::geom_point(ggplot2::aes(size = .data$N), color = "#2C7FB8") +
+      ggplot2::geom_line(color = "#2C7FB8") +
+      ggplot2::coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+      ggplot2::labs(
+        x = "Mean predicted risk",
+        y = "Observed event rate",
+        size = "Clusters",
+        title = "Risk-k calibration"
+      ) +
+      ggplot2::theme_minimal(base_size = 11)
+    ggplot2::ggsave(paste0(prefix, "_calibration_curve.pdf"), p, width = 5.5, height = 5)
+  }
+
+  invisible(TRUE)
+}
+
 train_and_save_reliability_model <- function(debug_dir,
                                              output_rds,
                                              target = c("first_pass_error", "refinement_benefit")) {
@@ -127,15 +254,23 @@ train_and_save_reliability_model <- function(debug_dir,
     summary_csv,
     row.names = FALSE
   )
+  write_explainability_outputs(model, features, output_rds)
 
   message("Saved reliability model to ", output_rds)
   message("Saved training features to ", feature_csv)
   invisible(model)
 }
 
-args <- commandArgs(trailingOnly = TRUE)
-debug_dir <- if (length(args) >= 1) args[1] else file.path("results", "benchmark_debug")
-output_rds <- if (length(args) >= 2) args[2] else file.path("results", "reliability_model_v1.1_error.rds")
-target <- if (length(args) >= 3) args[3] else "first_pass_error"
+should_auto_run_reliability_training <- function() {
+  value <- tolower(Sys.getenv("DEEPSEEKCELL_RUN_RELIABILITY_TRAINING_ON_SOURCE", unset = "true"))
+  value %in% c("1", "true", "yes", "y")
+}
 
-train_and_save_reliability_model(debug_dir, output_rds, target)
+if (should_auto_run_reliability_training()) {
+  args <- commandArgs(trailingOnly = TRUE)
+  debug_dir <- if (length(args) >= 1) args[1] else file.path("results", "benchmark_debug")
+  output_rds <- if (length(args) >= 2) args[2] else file.path("results", "reliability_model_v1.1_error.rds")
+  target <- if (length(args) >= 3) args[3] else "first_pass_error"
+
+  train_and_save_reliability_model(debug_dir, output_rds, target)
+}
