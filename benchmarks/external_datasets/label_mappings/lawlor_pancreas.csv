@@ -1,0 +1,9 @@
+original_label,harmonized_label,exclude,reason
+Alpha,Alpha cell,FALSE,
+Beta,Beta cell,FALSE,
+Delta,Delta cell,FALSE,
+Gamma/PP,Gamma cell,FALSE,
+Acinar,Acinar cell,FALSE,
+Ductal,Ductal cell,FALSE,
+Stellate,Stellate cell,FALSE,
+None/Other,Unknown,TRUE,unannotated_or_low_quality

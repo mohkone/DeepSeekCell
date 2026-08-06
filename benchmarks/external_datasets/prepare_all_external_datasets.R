@@ -1,8 +1,8 @@
 # benchmarks/external_datasets/prepare_all_external_datasets.R
 #
 # Prepare all eligible external datasets listed in registry.csv. Rows without a
-# local DataPath or MatrixPath are skipped rather than silently entering the
-# confirmatory panel.
+# local DataPath, MatrixPath, or supported virtual source are skipped rather
+# than silently entering the confirmatory panel.
 
 source(file.path("benchmarks", "external_datasets", "prepare_utils.R"))
 
@@ -14,6 +14,9 @@ row_has_input <- function(row) {
   }
   path <- clean_path(row$DataPath[[1]] %||% "")
   matrix_path <- clean_path(row$MatrixPath[[1]] %||% "")
+  if (is_external_virtual_source(path) || is_external_virtual_source(matrix_path)) {
+    return(TRUE)
+  }
   (nzchar(path) && (file.exists(path) || dir.exists(path))) ||
     (nzchar(matrix_path) && (file.exists(matrix_path) || dir.exists(matrix_path)))
 }
@@ -49,6 +52,19 @@ prepare_all_external_datasets <- function(registry_path = file.path("benchmarks"
                                           include_pending = FALSE,
                                           strict_confirmatory = TRUE) {
   registry <- read_external_registry(registry_path)
+  dataset_filter <- trimws(strsplit(Sys.getenv("DEEPSEEKCELL_EXTERNAL_DATASETS", unset = ""), ",", fixed = TRUE)[[1]])
+  dataset_filter <- dataset_filter[nzchar(dataset_filter)]
+  if (length(dataset_filter) > 0) {
+    missing_filter <- setdiff(dataset_filter, registry$Dataset)
+    if (length(missing_filter) > 0) {
+      stop(
+        "DEEPSEEKCELL_EXTERNAL_DATASETS contains unknown dataset(s): ",
+        paste(missing_filter, collapse = ", "),
+        call. = FALSE
+      )
+    }
+    registry <- registry[registry$Dataset %in% dataset_filter, , drop = FALSE]
+  }
   audit_dir <- file.path("results", "external_dataset_audits")
   dir.create(audit_dir, recursive = TRUE, showWarnings = FALSE)
 

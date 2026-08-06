@@ -59,12 +59,71 @@ external_clean_label <- function(x) {
   x
 }
 
+external_map_ensembl_symbols <- function(ids, species) {
+  ids <- external_clean_label(ids)
+  if (!any(grepl("^ENS[A-Z]*G[0-9]+", ids))) {
+    return(ids)
+  }
+
+  species <- tolower(external_clean_label(species %||% ""))
+  if (!grepl("human|homo sapiens", species)) {
+    warning(
+      "Ensembl-like feature identifiers detected, but no locked local ",
+      "annotation map is configured for species: ", species,
+      call. = FALSE
+    )
+    return(ids)
+  }
+
+  if (!requireNamespace("AnnotationDbi", quietly = TRUE) ||
+      !requireNamespace("EnsDb.Hsapiens.v86", quietly = TRUE)) {
+    warning(
+      "Ensembl-like feature identifiers detected, but AnnotationDbi and ",
+      "EnsDb.Hsapiens.v86 are required for locked human symbol conversion.",
+      call. = FALSE
+    )
+    return(ids)
+  }
+
+  stripped <- sub("\\.[0-9]+$", "", ids)
+  mapped <- tryCatch(
+    AnnotationDbi::mapIds(
+      EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86,
+      keys = unique(stripped),
+      keytype = "GENEID",
+      column = "SYMBOL",
+      multiVals = "first"
+    ),
+    error = function(e) {
+      warning("Could not map Ensembl identifiers to symbols: ", conditionMessage(e), call. = FALSE)
+      NULL
+    }
+  )
+  if (is.null(mapped)) {
+    return(ids)
+  }
+
+  out <- unname(mapped[stripped])
+  out <- external_clean_label(out)
+  usable <- !is.na(out) & nzchar(out)
+  if (mean(usable, na.rm = TRUE) < 0.5) {
+    warning(
+      "Mapped fewer than half of Ensembl-like feature identifiers to symbols; ",
+      "keeping original identifiers.",
+      call. = FALSE
+    )
+    return(ids)
+  }
+  out[!usable] <- ids[!usable]
+  out
+}
+
 is_unannotated_external_label <- function(x) {
   x <- tolower(trimws(as.character(x)))
   is.na(x) |
     !nzchar(x) |
-    x %in% c("na", "nan", "none", "unknown", "unassigned", "unannotated", "ambiguous") |
-    grepl("unclassified|unresolved|doublet|multiplet|low quality|remove|discard", x)
+    x %in% c("na", "nan", "none", "none/other", "other", "unknown", "unassigned", "unannotated", "ambiguous") |
+    grepl("unclassified|unresolved|contaminated|doublet|multiplet|low quality|remove|discard", x)
 }
 
 read_label_mapping <- function(path) {
@@ -126,8 +185,28 @@ read_external_table <- function(path) {
   }
 }
 
+is_external_virtual_source <- function(path) {
+  !is_blank_external(path) && grepl("^scRNAseq::[A-Za-z][A-Za-z0-9_.]*\\(", trimws(path))
+}
+
+read_external_scrnaseq_source <- function(path) {
+  call_text <- trimws(path)
+  call_text <- sub("^scRNAseq::", "", call_text)
+  if (!grepl("^[A-Za-z][A-Za-z0-9_.]*\\(", call_text)) {
+    stop("Invalid scRNAseq source declaration: ", path, call. = FALSE)
+  }
+  if (!requireNamespace("scRNAseq", quietly = TRUE)) {
+    stop("scRNAseq is required to load virtual source: ", path, call. = FALSE)
+  }
+  message("Loading scRNAseq source: scRNAseq::", call_text)
+  eval(parse(text = paste0("scRNAseq::", call_text)))
+}
+
 read_external_matrix <- function(path) {
   if (is_blank_external(path)) return(NULL)
+  if (is_external_virtual_source(path)) {
+    return(read_external_scrnaseq_source(path))
+  }
   if (!file.exists(path) && !dir.exists(path)) {
     stop("Matrix/DataPath not found: ", path, call. = FALSE)
   }
@@ -165,7 +244,39 @@ coerce_external_to_seurat <- function(object, row) {
   if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop("Seurat is required for external dataset preparation.", call. = FALSE)
   }
+  ensure_unique_features <- function(counts, feature_names = NULL) {
+    features <- feature_names %||% rownames(counts)
+    if (is.null(features)) {
+      features <- paste0("Gene", seq_len(nrow(counts)))
+    }
+    features <- external_clean_label(features)
+    missing <- !nzchar(features) | is.na(features)
+    features[missing] <- paste0("Gene", which(missing))
+    features <- external_map_ensembl_symbols(features, row$Species[[1]] %||% "")
+    rownames(counts) <- make.unique(features)
+    counts
+  }
+  sce_feature_names <- function(object) {
+    row_data <- tryCatch(
+      as.data.frame(SummarizedExperiment::rowData(object)),
+      error = function(e) data.frame()
+    )
+    candidates <- c(
+      "symbol", "Symbol", "gene_symbol", "GeneSymbol", "gene", "Gene",
+      "gene_name", "GeneName", "external_gene_name"
+    )
+    for (column in intersect(candidates, names(row_data))) {
+      values <- external_clean_label(row_data[[column]])
+      usable <- !is.na(values) & nzchar(values)
+      if (sum(usable) >= max(10, 0.5 * length(values))) {
+        values[!usable] <- rownames(object)[!usable]
+        return(values)
+      }
+    }
+    rownames(object)
+  }
   if (inherits(object, "Seurat")) {
+    rownames(object) <- make.unique(external_clean_label(rownames(object)))
     return(object)
   }
   if (inherits(object, "SingleCellExperiment")) {
@@ -173,14 +284,27 @@ coerce_external_to_seurat <- function(object, row) {
       stop("SummarizedExperiment is required to convert SingleCellExperiment inputs.", call. = FALSE)
     }
     assay_name <- row$AssayName %||% "counts"
-    counts <- SummarizedExperiment::assay(object, assay_name)
+    assay_names <- SummarizedExperiment::assayNames(object)
+    if (!assay_name %in% assay_names && length(assay_names) == 1) {
+      warning(
+        "AssayName '", assay_name, "' not found; using sole assay '",
+        assay_names[[1]], "'.",
+        call. = FALSE
+      )
+      assay_name <- assay_names[[1]]
+    }
+    counts <- ensure_unique_features(
+      SummarizedExperiment::assay(object, assay_name),
+      feature_names = sce_feature_names(object)
+    )
     meta <- as.data.frame(SummarizedExperiment::colData(object))
     return(Seurat::CreateSeuratObject(counts = counts, meta.data = meta))
   }
   if (is.list(object) && all(c("counts", "metadata") %in% names(object))) {
-    return(Seurat::CreateSeuratObject(counts = object$counts, meta.data = as.data.frame(object$metadata)))
+    return(Seurat::CreateSeuratObject(counts = ensure_unique_features(object$counts), meta.data = as.data.frame(object$metadata)))
   }
   if (is.matrix(object) || inherits(object, "Matrix")) {
+    object <- ensure_unique_features(object)
     metadata <- NULL
     metadata_path <- row$MetadataPath %||% ""
     if (!is_blank_external(metadata_path) && file.exists(metadata_path)) {

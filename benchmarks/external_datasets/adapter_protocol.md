@@ -39,6 +39,12 @@ selection rationale.
 Rows are not confirmatory until `InclusionDecision = include` and the leakage
 flags pass validation.
 
+Registry `DataPath` values may point to local files/directories or to locked
+virtual sources of the form `scRNAseq::FunctionName(arguments)`. Virtual
+sources are evaluated by the adapter engine and then converted through the same
+common preparation workflow as local Seurat, SingleCellExperiment, h5ad, 10x,
+and matrix inputs.
+
 ## Adapter Entry Points
 
 Current study entrypoints are:
@@ -52,6 +58,23 @@ prepare_all_external_datasets.R
 
 Each study adapter calls the same common preparation engine in
 `prepare_utils.R`.
+
+The initial prepared pilot panel is generated from `prepare_all_external_datasets.R`
+and currently includes:
+
+```text
+BunisHSPC
+SegerstolpePancreas
+LawlorPancreas
+XinPancreas
+DarmanisBrain
+PollenGlia
+WuKidneyHealthy
+```
+
+Large or unresolved candidates remain in the registry with `pending` or
+`planned` status until their retrieval, gene-symbol handling, label mappings,
+and leakage checks are frozen.
 
 ## Common Locked Preparation Steps
 
@@ -72,6 +95,10 @@ Each adapter:
 8. Writes the prepared RDS, cluster audit CSV, dataset audit CSV, hash CSV, and
    HTML audit report.
 9. Validates the prepared object against the locked contract and leakage rules.
+
+When source row names are Ensembl identifiers and no gene-symbol column is
+available, the preparation engine may apply a locked species-specific symbol
+mapping. The audit output records mapping success and unmapped identifiers.
 
 ## Strict Eligibility Checks
 
@@ -103,6 +130,9 @@ Rscript benchmarks/external_datasets/prepare_all_external_datasets.R \
   data/external_prepared \
   benchmarks/external_validation_manifest.csv
 ```
+
+To prepare only a named subset, set `DEEPSEEKCELL_EXTERNAL_DATASETS` to a
+comma-separated dataset list before running the adapter.
 
 Stage B runs the locked evaluation:
 

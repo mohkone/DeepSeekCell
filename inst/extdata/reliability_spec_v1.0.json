@@ -24,7 +24,7 @@
   "selector": {
     "default_strategy": "evidence",
     "matched_budget_rule": "When no explicit budget is supplied, Evidence-k selects all clusters with RequiresRefinement = TRUE; Random-k, Confidence-k, and NoOntology-k use the same k within each dataset-replicate block.",
-    "evidence_ranking_rule": "Rank RequiresRefinement clusters by descending EvidenceConflictScore; ties are resolved by the input cluster order after first-pass parsing.",
+    "evidence_ranking_rule": "Without an explicit budget, select RequiresRefinement clusters ranked by descending EvidenceConflictScore. With a fixed budget k, rank all clusters by EvidenceConflictScore, BestMarkerEvidenceScore and MarkerEvidenceScore margin, then select the top k.",
     "confidence_ranking_rule": "Rank all clusters by ascending raw LLMConfidence; ties are resolved by the input cluster order.",
     "random_ranking_rule": "Sample k clusters without replacement using the prespecified replicate-level random seed.",
     "full_refinement_rule": "Review every first-pass cluster."
@@ -61,6 +61,8 @@
       "neuron": ["SNAP25", "SYT1", "RBFOX3", "TUBB3", "MAP2", "STMN2"],
       "glutamatergic neuron": ["SLC17A7", "SLC17A6", "CAMK2A", "SATB2", "TBR1"],
       "GABAergic neuron": ["GAD1", "GAD2", "SLC32A1", "DLX1", "DLX2"],
+      "radial glia": ["HOPX", "VIM", "SOX2", "PAX6", "NES", "FABP7"],
+      "neural progenitor cell": ["SOX2", "NES", "MKI67", "TOP2A", "PAX6", "ASCL1"],
       "astrocyte": ["GFAP", "AQP4", "ALDH1L1", "SLC1A3", "GJA1", "S100B"],
       "oligodendrocyte": ["MBP", "MOG", "PLP1", "MOBP", "MAG", "CLDN11"],
       "oligodendrocyte precursor cell": ["PDGFRA", "CSPG4", "VCAN", "SOX10", "OLIG1", "OLIG2"],
@@ -78,6 +80,24 @@
       "ionocyte": ["FOXI1", "CFTR", "ASCL3", "ATP6V1B1", "ATP6V0D2"],
       "lung endothelial cell": ["PECAM1", "VWF", "CLDN5", "EMCN", "CA4", "RGCC"],
       "lung fibroblast": ["COL1A1", "COL1A2", "DCN", "LUM", "PDGFRA", "COL3A1"]
+    },
+    "hematopoietic": {
+      "hematopoietic stem/progenitor cell": ["CD34", "PROM1", "SPINK2", "HLF", "MEIS1", "GATA2", "AVP", "CRHBP"],
+      "common lymphoid progenitor": ["IL7R", "DNTT", "RAG1", "RAG2", "VPREB1", "CD79A", "MME"],
+      "granulocyte-monocyte progenitor": ["MPO", "ELANE", "AZU1", "CTSG", "PRTN3", "LYZ", "S100A8", "S100A9"],
+      "megakaryocyte-erythroid progenitor": ["GATA1", "KLF1", "GYPA", "ALAS2", "HBB", "HBA1", "HBA2", "PF4"],
+      "erythroid progenitor cell": ["GATA1", "KLF1", "ALAS2", "HBB", "HBA1", "HBA2", "GYPA", "AHSP"]
+    },
+    "kidney": {
+      "proximal tubule cell": ["SLC34A1", "SLC5A2", "LRP2", "CUBN", "ALDOB", "ACSM2", "AQP1", "SLC4A4"],
+      "distal convoluted tubule cell": ["SLC12A3", "TRPM6", "CALB1", "PVALB", "FXYD2", "WNK1"],
+      "connecting tubule cell": ["CALB1", "SCNN1G", "TRPV5", "FXYD4", "KCNJ1", "AQP2"],
+      "loop of Henle cell": ["SLC12A1", "UMOD", "CLDN10", "KCNJ1", "FXYD2", "CLDN16"],
+      "collecting duct principal cell": ["AQP2", "AQP3", "AQP4", "SCNN1G", "AVPR2", "FXYD4"],
+      "intercalated cell": ["ATP6V1B1", "ATP6V0D2", "SLC4A1", "SLC26A4", "FOXI1", "KIT"],
+      "podocyte": ["NPHS1", "NPHS2", "PODXL", "WT1", "SYNPO", "MAFB"],
+      "mesangial cell": ["PDGFRB", "MEIS1", "POSTN", "TAGLN", "ACTA2", "MYL9"],
+      "kidney endothelial cell": ["PECAM1", "VWF", "KDR", "EMCN", "FLT1", "CLDN5"]
     },
     "prostate": {
       "prostate epithelial cell": ["KLK3", "KLK2", "MSMB", "ACPP", "KRT8", "KRT18"],
@@ -99,18 +119,33 @@
     "ductal cell": ["pancreatic ductal cell", "duct epithelial cell"],
     "glutamatergic neuron": "excitatory neuron",
     "GABAergic neuron": ["inhibitory neuron", "gabaergic interneuron"],
+    "radial glia": "rg",
+    "neural progenitor cell": ["neural progenitor", "fetal quiescent"],
     "oligodendrocyte precursor cell": ["opc", "ng2 cell", "ng2 glia"],
     "microglial cell": "microglia",
     "AT1 cell": ["alveolar type 1 cell", "type 1 pneumocyte", "ati cell"],
     "AT2 cell": ["alveolar type 2 cell", "type 2 pneumocyte", "atii cell"],
     "club cell": "clara cell",
     "lung fibroblast": ["fibroblast of lung", "pulmonary interstitial fibroblast"],
-    "lung endothelial cell": ["endothelial cell of lung", "pulmonary endothelial cell"]
+    "lung endothelial cell": ["endothelial cell of lung", "pulmonary endothelial cell"],
+    "hematopoietic stem/progenitor cell": ["hspc", "hsc/mpp", "hsc", "mpp", "hematopoietic progenitor cell"],
+    "common lymphoid progenitor": ["clp", "lymphoid progenitor"],
+    "granulocyte-monocyte progenitor": ["gmp", "myeloid progenitor"],
+    "megakaryocyte-erythroid progenitor": ["mep", "erythroid megakaryocyte progenitor"],
+    "proximal tubule cell": ["proximal tubular cell", "pt", "pt s1 s2", "pt s3"],
+    "distal convoluted tubule cell": ["dct", "distal tubule cell"],
+    "connecting tubule cell": ["cnt", "connecting tubule"],
+    "loop of Henle cell": ["loop of henle", "lh al", "lh dl", "thick ascending limb", "thin descending limb"],
+    "collecting duct principal cell": ["principal cell", "collecting duct cell"],
+    "intercalated cell": ["ic", "ic a", "ic b", "type a intercalated cell", "type b intercalated cell"],
+    "kidney endothelial cell": ["renal endothelial cell", "endothelial cell of kidney"],
+    "mesangial cell": "mc",
+    "podocyte": "pod"
   },
   "software": {
     "package": "DeepSeekCell",
     "version": "0.1.0",
-    "commit_recorded_at_freeze": "704cf9203e9d",
+    "commit_recorded_at_freeze": "27c97215b022",
     "release_tag": "v0.1.0"
   },
   "ontology": {

@@ -33,6 +33,8 @@ MARKER_EVIDENCE_PROFILES <- list(
     "neuron" = c("SNAP25", "SYT1", "RBFOX3", "TUBB3", "MAP2", "STMN2"),
     "glutamatergic neuron" = c("SLC17A7", "SLC17A6", "CAMK2A", "SATB2", "TBR1"),
     "GABAergic neuron" = c("GAD1", "GAD2", "SLC32A1", "DLX1", "DLX2"),
+    "radial glia" = c("HOPX", "VIM", "SOX2", "PAX6", "NES", "FABP7"),
+    "neural progenitor cell" = c("SOX2", "NES", "MKI67", "TOP2A", "PAX6", "ASCL1"),
     "astrocyte" = c("GFAP", "AQP4", "ALDH1L1", "SLC1A3", "GJA1", "S100B"),
     "oligodendrocyte" = c("MBP", "MOG", "PLP1", "MOBP", "MAG", "CLDN11"),
     "oligodendrocyte precursor cell" = c("PDGFRA", "CSPG4", "VCAN", "SOX10", "OLIG1", "OLIG2"),
@@ -50,6 +52,24 @@ MARKER_EVIDENCE_PROFILES <- list(
     "ionocyte" = c("FOXI1", "CFTR", "ASCL3", "ATP6V1B1", "ATP6V0D2"),
     "lung endothelial cell" = c("PECAM1", "VWF", "CLDN5", "EMCN", "CA4", "RGCC"),
     "lung fibroblast" = c("COL1A1", "COL1A2", "DCN", "LUM", "PDGFRA", "COL3A1")
+  ),
+  hematopoietic = list(
+    "hematopoietic stem/progenitor cell" = c("CD34", "PROM1", "SPINK2", "HLF", "MEIS1", "GATA2", "AVP", "CRHBP"),
+    "common lymphoid progenitor" = c("IL7R", "DNTT", "RAG1", "RAG2", "VPREB1", "CD79A", "MME"),
+    "granulocyte-monocyte progenitor" = c("MPO", "ELANE", "AZU1", "CTSG", "PRTN3", "LYZ", "S100A8", "S100A9"),
+    "megakaryocyte-erythroid progenitor" = c("GATA1", "KLF1", "GYPA", "ALAS2", "HBB", "HBA1", "HBA2", "PF4"),
+    "erythroid progenitor cell" = c("GATA1", "KLF1", "ALAS2", "HBB", "HBA1", "HBA2", "GYPA", "AHSP")
+  ),
+  kidney = list(
+    "proximal tubule cell" = c("SLC34A1", "SLC5A2", "LRP2", "CUBN", "ALDOB", "ACSM2", "AQP1", "SLC4A4"),
+    "distal convoluted tubule cell" = c("SLC12A3", "TRPM6", "CALB1", "PVALB", "FXYD2", "WNK1"),
+    "connecting tubule cell" = c("CALB1", "SCNN1G", "TRPV5", "FXYD4", "KCNJ1", "AQP2"),
+    "loop of Henle cell" = c("SLC12A1", "UMOD", "CLDN10", "KCNJ1", "FXYD2", "CLDN16"),
+    "collecting duct principal cell" = c("AQP2", "AQP3", "AQP4", "SCNN1G", "AVPR2", "FXYD4"),
+    "intercalated cell" = c("ATP6V1B1", "ATP6V0D2", "SLC4A1", "SLC26A4", "FOXI1", "KIT"),
+    "podocyte" = c("NPHS1", "NPHS2", "PODXL", "WT1", "SYNPO", "MAFB"),
+    "mesangial cell" = c("PDGFRB", "MEIS1", "POSTN", "TAGLN", "ACTA2", "MYL9"),
+    "kidney endothelial cell" = c("PECAM1", "VWF", "KDR", "EMCN", "FLT1", "CLDN5")
   ),
   prostate = list(
     "prostate epithelial cell" = c("KLK3", "KLK2", "MSMB", "ACPP", "KRT8", "KRT18"),
@@ -72,13 +92,28 @@ MARKER_PROFILE_ALIASES <- list(
   "ductal cell" = c("pancreatic ductal cell", "duct epithelial cell"),
   "glutamatergic neuron" = c("excitatory neuron"),
   "GABAergic neuron" = c("inhibitory neuron", "gabaergic interneuron"),
+  "radial glia" = c("rg"),
+  "neural progenitor cell" = c("neural progenitor", "fetal quiescent"),
   "oligodendrocyte precursor cell" = c("opc", "ng2 cell", "ng2 glia"),
   "microglial cell" = c("microglia"),
   "AT1 cell" = c("alveolar type 1 cell", "type 1 pneumocyte", "ati cell"),
   "AT2 cell" = c("alveolar type 2 cell", "type 2 pneumocyte", "atii cell"),
   "club cell" = c("clara cell"),
   "lung fibroblast" = c("fibroblast of lung", "pulmonary interstitial fibroblast"),
-  "lung endothelial cell" = c("endothelial cell of lung", "pulmonary endothelial cell")
+  "lung endothelial cell" = c("endothelial cell of lung", "pulmonary endothelial cell"),
+  "hematopoietic stem/progenitor cell" = c("hspc", "hsc/mpp", "hsc", "mpp", "hematopoietic progenitor cell"),
+  "common lymphoid progenitor" = c("clp", "lymphoid progenitor"),
+  "granulocyte-monocyte progenitor" = c("gmp", "myeloid progenitor"),
+  "megakaryocyte-erythroid progenitor" = c("mep", "erythroid megakaryocyte progenitor"),
+  "proximal tubule cell" = c("proximal tubular cell", "pt", "pt s1 s2", "pt s3"),
+  "distal convoluted tubule cell" = c("dct", "distal tubule cell"),
+  "connecting tubule cell" = c("cnt", "connecting tubule"),
+  "loop of Henle cell" = c("loop of henle", "lh al", "lh dl", "thick ascending limb", "thin descending limb"),
+  "collecting duct principal cell" = c("principal cell", "collecting duct cell"),
+  "intercalated cell" = c("ic", "ic a", "ic b", "type a intercalated cell", "type b intercalated cell"),
+  "kidney endothelial cell" = c("renal endothelial cell", "endothelial cell of kidney"),
+  "mesangial cell" = c("mc"),
+  "podocyte" = c("pod")
 )
 
 RELIABILITY_SPEC_ID <- "DeepSeekCell reliability specification v1.0"
@@ -131,8 +166,10 @@ get_reliability_spec <- function(include_marker_profiles = TRUE) {
         "NoOntology-k use the same k within each dataset-replicate block."
       ),
       evidence_ranking_rule = paste(
-        "Rank RequiresRefinement clusters by descending EvidenceConflictScore;",
-        "ties are resolved by the input cluster order after first-pass parsing."
+        "Without an explicit budget, select RequiresRefinement clusters ranked",
+        "by descending EvidenceConflictScore. With a fixed budget k, rank all",
+        "clusters by EvidenceConflictScore, BestMarkerEvidenceScore and",
+        "MarkerEvidenceScore margin, then select the top k."
       ),
       confidence_ranking_rule = paste(
         "Rank all clusters by ascending raw LLMConfidence; ties are resolved by",
@@ -383,6 +420,7 @@ select_refinement_candidates <- function(annotations,
   evidence_flags[is.na(evidence_flags)] <- FALSE
   matched_budget <- sum(evidence_flags)
 
+  budget_supplied <- !is.null(budget)
   if (is.null(budget)) {
     budget <- switch(
       strategy,
@@ -404,12 +442,20 @@ select_refinement_candidates <- function(annotations,
   score <- rep(NA_real_, nrow(annotations))
 
   if (identical(strategy, "evidence")) {
-    candidate_idx <- which(evidence_flags)
-    if (length(candidate_idx) == 0) {
-      return(empty_selection())
-    }
     score <- .evidence_conflict_score(annotations)
-    ord <- candidate_idx[order(score[candidate_idx], decreasing = TRUE)]
+    if (isTRUE(budget_supplied)) {
+      best_marker <- suppressWarnings(as.numeric(annotations$BestMarkerEvidenceScore %||% 0))
+      best_marker[is.na(best_marker)] <- 0
+      predicted_marker <- suppressWarnings(as.numeric(annotations$MarkerEvidenceScore %||% 0))
+      predicted_marker[is.na(predicted_marker)] <- 0
+      ord <- order(score, best_marker, -predicted_marker, decreasing = TRUE)
+    } else {
+      candidate_idx <- which(evidence_flags)
+      if (length(candidate_idx) == 0) {
+        return(empty_selection())
+      }
+      ord <- candidate_idx[order(score[candidate_idx], decreasing = TRUE)]
+    }
   } else if (identical(strategy, "risk")) {
     risk <- annotations$PredictedReliabilityRisk %||%
       annotations$PredictedErrorRisk %||%

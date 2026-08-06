@@ -1,0 +1,5 @@
+original_label,harmonized_label,exclude,reason
+Neuron,Excitatory neuron,FALSE,
+Interneuron,Inhibitory neuron,FALSE,
+RG,Radial glia,FALSE,
+IPC,Neural progenitor cell,FALSE,

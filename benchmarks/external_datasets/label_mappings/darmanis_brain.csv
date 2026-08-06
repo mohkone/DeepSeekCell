@@ -1,0 +1,10 @@
+original_label,harmonized_label,exclude,reason
+neurons,Excitatory neuron,FALSE,
+astrocytes,Astrocyte,FALSE,
+oligodendrocytes,Oligodendrocyte,FALSE,
+OPC,Oligodendrocyte precursor cell,FALSE,
+microglia,Microglia,FALSE,
+endothelial,Endothelial cell,FALSE,
+fetal_quiescent,Neural progenitor cell,FALSE,developmental_state_label
+fetal_replicating,Neural progenitor cell,FALSE,developmental_state_label
+hybrid,Unknown,TRUE,ambiguous_or_mixed_label

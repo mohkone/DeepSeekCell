@@ -184,15 +184,69 @@ custom_mapping <- list(
     "erythrocytes" = "Erythrocyte",
     "red blood cell" = "Erythrocyte",
     "red blood cells" = "Erythrocyte"
+  ),
+  hematopoietic = c(
+    "hspc" = "Hematopoietic stem/progenitor cell",
+    "hsc mpp" = "Hematopoietic stem/progenitor cell",
+    "hsc" = "Hematopoietic stem/progenitor cell",
+    "mpp" = "Hematopoietic stem/progenitor cell",
+    "hematopoietic progenitor cell" = "Hematopoietic stem/progenitor cell",
+    "hematopoietic stem progenitor cell" = "Hematopoietic stem/progenitor cell",
+    "clp" = "Common lymphoid progenitor",
+    "common lymphoid progenitor" = "Common lymphoid progenitor",
+    "gmp" = "Granulocyte-monocyte progenitor",
+    "granulocyte monocyte progenitor" = "Granulocyte-monocyte progenitor",
+    "myeloid progenitor" = "Granulocyte-monocyte progenitor",
+    "mep" = "Megakaryocyte-erythroid progenitor",
+    "megakaryocyte erythroid progenitor" = "Megakaryocyte-erythroid progenitor",
+    "erythroid progenitor" = "Erythroid progenitor cell",
+    "erythroid progenitor cell" = "Erythroid progenitor cell",
+    "mid" = "Hematopoietic stem/progenitor cell"
+  ),
+  kidney = c(
+    "pt s1 s2" = "Proximal tubule cell",
+    "pt s3" = "Proximal tubule cell",
+    "pt" = "Proximal tubule cell",
+    "proximal tubule" = "Proximal tubule cell",
+    "proximal tubule cell" = "Proximal tubule cell",
+    "proximal tubular cell" = "Proximal tubule cell",
+    "dct" = "Distal convoluted tubule cell",
+    "distal convoluted tubule" = "Distal convoluted tubule cell",
+    "distal convoluted tubule cell" = "Distal convoluted tubule cell",
+    "cnt" = "Connecting tubule cell",
+    "connecting tubule" = "Connecting tubule cell",
+    "connecting tubule cell" = "Connecting tubule cell",
+    "lh al" = "Loop of Henle cell",
+    "lh dl" = "Loop of Henle cell",
+    "loop of henle" = "Loop of Henle cell",
+    "loop of henle cell" = "Loop of Henle cell",
+    "collecting duct principal cell" = "Collecting duct principal cell",
+    "collecting duct cell" = "Collecting duct principal cell",
+    "principal cell" = "Collecting duct principal cell",
+    "ic a" = "Intercalated cell",
+    "ic b" = "Intercalated cell",
+    "ic" = "Intercalated cell",
+    "intercalated cell" = "Intercalated cell",
+    "pod" = "Podocyte",
+    "podocyte" = "Podocyte",
+    "mc" = "Mesangial cell",
+    "mesangial cell" = "Mesangial cell",
+    "ec" = "Endothelial cell",
+    "endothelial cell" = "Endothelial cell",
+    "m" = "Immune cell",
+    "macrophage" = "Immune cell",
+    "immune cell" = "Immune cell"
   )
 )
 
 get_domain <- function(tissue) {
   tissue_low <- tolower(tissue)
-  if (tissue_low %in% c("pbmc", "blood", "immune system")) return("immune")
+  if (tissue_low %in% c("hematopoietic system", "hematopoietic", "hspc")) return("hematopoietic")
+  if (tissue_low %in% c("pbmc", "blood", "immune system") || grepl("t cells?", tissue_low)) return("immune")
   if (grepl("pancreas", tissue_low)) return("pancreas")
   if (grepl("brain", tissue_low)) return("brain")
   if (grepl("lung", tissue_low)) return("lung")
+  if (grepl("kidney", tissue_low)) return("kidney")
   "general"
 }
 
@@ -255,6 +309,8 @@ harmonise_labels <- function(labels, tissue, ont_data = NULL) {
       else if (grepl("macrophage|immune", lab)) out[i] <- "Immune cell"
     } else if (domain == "brain") {
       if (grepl("inhibitory|gaba|interneuron|pvalb|vip|sst", lab)) out[i] <- "Inhibitory neuron"
+      else if (grepl("radial glia|(^| )rg($| )", lab)) out[i] <- "Radial glia"
+      else if (grepl("neural progenitor|fetal quiescent", lab)) out[i] <- "Neural progenitor cell"
       else if (grepl("excitatory|glutamatergic|cholinergic|neuron", lab)) out[i] <- "Excitatory neuron"
       else if (grepl("astro", lab)) out[i] <- "Astrocyte"
       else if (grepl("macrophage|perivascular|(^| )pvm", lab)) out[i] <- "Macrophage"
@@ -282,6 +338,23 @@ harmonise_labels <- function(labels, tissue, ont_data = NULL) {
       else if (grepl("smooth muscle", lab)) out[i] <- "Smooth muscle cell"
       else if (grepl("^[bt]?rbc$|erythrocyte|erythroid|red blood cell", lab)) out[i] <- "Erythrocyte"
       else if (grepl("neuroendocrine", lab)) out[i] <- "Epithelial cell"
+    } else if (domain == "hematopoietic") {
+      if (grepl("clp|common lymphoid", lab)) out[i] <- "Common lymphoid progenitor"
+      else if (grepl("gmp|granulocyte.*monocyte|myeloid progenitor", lab)) out[i] <- "Granulocyte-monocyte progenitor"
+      else if (grepl("mep|megakaryocyte.*erythroid", lab)) out[i] <- "Megakaryocyte-erythroid progenitor"
+      else if (grepl("erythroid", lab)) out[i] <- "Erythroid progenitor cell"
+      else if (grepl("hsc|mpp|hspc|stem|progenitor|mid", lab)) out[i] <- "Hematopoietic stem/progenitor cell"
+    } else if (domain == "kidney") {
+      if (grepl("proximal|(^| )pt($| )|pt s", lab)) out[i] <- "Proximal tubule cell"
+      else if (grepl("distal convoluted|(^| )dct($| )", lab)) out[i] <- "Distal convoluted tubule cell"
+      else if (grepl("connecting|(^| )cnt($| )", lab)) out[i] <- "Connecting tubule cell"
+      else if (grepl("loop of henle|(^| )lh($| )|lh al|lh dl", lab)) out[i] <- "Loop of Henle cell"
+      else if (grepl("collecting duct|principal cell", lab)) out[i] <- "Collecting duct principal cell"
+      else if (grepl("intercalated|(^| )ic($| )|ic a|ic b", lab)) out[i] <- "Intercalated cell"
+      else if (grepl("podocyte|(^| )pod($| )", lab)) out[i] <- "Podocyte"
+      else if (grepl("mesangial|(^| )mc($| )", lab)) out[i] <- "Mesangial cell"
+      else if (grepl("endothelial|(^| )ec($| )", lab)) out[i] <- "Endothelial cell"
+      else if (grepl("macrophage|immune|(^| )m($| )", lab)) out[i] <- "Immune cell"
     }
 
     if (out[i] == "Unknown") {
@@ -649,12 +722,26 @@ load_benchmark_reliability_model <- function() {
   model
 }
 
-read_llm_response_cache <- function(cache_file) {
+read_llm_response_cache <- function(cache_file, expected_prompt_hash = NULL) {
   if (!use_llm_response_cache() || !file.exists(cache_file)) {
     return(NULL)
   }
 
-  tryCatch(read_first_pass_cache(cache_file), error = function(e) NULL)
+  cached <- tryCatch(read_first_pass_cache(cache_file), error = function(e) NULL)
+  if (is.null(cached)) {
+    return(NULL)
+  }
+
+  if (!is.null(expected_prompt_hash) && nzchar(expected_prompt_hash)) {
+    cached_prompt_hash <- cached$metadata$prompt_hash %||% NA_character_
+    if (is.na(cached_prompt_hash) ||
+        !identical(as.character(cached_prompt_hash), as.character(expected_prompt_hash))) {
+      message("Ignoring stale LLM cache with mismatched prompt hash: ", cache_file)
+      return(NULL)
+    }
+  }
+
+  cached
 }
 
 select_refinement_clusters <- function(first_pass_evidence,
@@ -662,7 +749,8 @@ select_refinement_clusters <- function(first_pass_evidence,
                                        k,
                                        replicate,
                                        dataset_name,
-                                       reliability_model = NULL) {
+                                       reliability_model = NULL,
+                                       require_conflict = NULL) {
   clusters <- as.character(first_pass_evidence$Cluster)
   k <- suppressWarnings(as.integer(k %||% 0))
   if (length(k) == 0 || is.na(k)) {
@@ -681,7 +769,28 @@ select_refinement_clusters <- function(first_pass_evidence,
   if (identical(selector, "evidence-k")) {
     requires_refinement <- as_flag(first_pass_evidence$RequiresRefinement)
     requires_refinement[is.na(requires_refinement)] <- FALSE
-    return(clusters[requires_refinement])
+    if (is.null(require_conflict)) {
+      require_conflict <- TRUE
+    }
+    if (isTRUE(require_conflict)) {
+      return(clusters[requires_refinement])
+    }
+
+    evidence_score <- suppressWarnings(as.numeric(first_pass_evidence$EvidenceConflictScore %||% 0))
+    evidence_score[is.na(evidence_score)] <- 0
+    best_marker <- suppressWarnings(as.numeric(first_pass_evidence$BestMarkerEvidenceScore %||% 0))
+    best_marker[is.na(best_marker)] <- 0
+    predicted_marker <- suppressWarnings(as.numeric(first_pass_evidence$MarkerEvidenceScore %||% 0))
+    predicted_marker[is.na(predicted_marker)] <- 0
+
+    ord <- order(
+      evidence_score,
+      best_marker,
+      -predicted_marker,
+      decreasing = TRUE,
+      na.last = TRUE
+    )
+    return(clusters[head(ord, k)])
   }
 
   if (identical(selector, "evidence-no-ontology-k")) {
@@ -799,13 +908,16 @@ run_refinement_control <- function(selector,
       "_refinement_", selector_slug, ".rds"
     )
   )
-  cached <- read_llm_response_cache(refinement_cache)
-
   refinement_prompt <- create_refinement_prompt(
     markers = markers,
     annotations = selected_annotations,
     tissue = tissue,
     species = species
+  )
+  refinement_prompt_hash <- hash_text_md5(refinement_prompt)
+  cached <- read_llm_response_cache(
+    refinement_cache,
+    expected_prompt_hash = refinement_prompt_hash
   )
 
   if (!is.null(cached)) {
@@ -817,7 +929,7 @@ run_refinement_control <- function(selector,
     out$completion_tokens <- safe_usage_number(cached$metadata$completion_tokens)
     out$second_pass_calls <- 1
     out$response_hash <- cached$response_hash %||% hash_text_md5(content)
-    out$prompt_hash <- cached$metadata$prompt_hash %||% hash_text_md5(refinement_prompt)
+    out$prompt_hash <- refinement_prompt_hash
     refinement_success <- nzchar(trimws(content))
   } else {
     refinement_res <- call_llm_api(refinement_prompt, model_key, api_key)
@@ -830,7 +942,7 @@ run_refinement_control <- function(selector,
     out$completion_tokens <- safe_usage_number(refinement_res$usage$completion_tokens)
     out$second_pass_calls <- 1
     out$response_hash <- hash_text_md5(content)
-    out$prompt_hash <- hash_text_md5(refinement_prompt)
+    out$prompt_hash <- refinement_prompt_hash
     refinement_success <- isTRUE(refinement_res$success)
 
     write_first_pass_cache(
@@ -874,7 +986,8 @@ run_llm_ablation_wrapper <- function(dataset_name,
                                      api_key = NULL,
                                      method_prefix = MODELS[[model_key]]$name %||% model_key,
                                      cache_slug = model_key,
-                                     include_full_refinement = TRUE) {
+                                     include_full_refinement = TRUE,
+                                     fixed_refinement_budget_k = NULL) {
   markers <- data$markers
   tissue <- data$tissue
   species <- data$species
@@ -887,13 +1000,18 @@ run_llm_ablation_wrapper <- function(dataset_name,
     first_pass_dir,
     paste0("rep", replicate, "_", dataset_name, "_", cache_slug, "_first_pass.rds")
   )
-  cached_first_pass <- read_llm_response_cache(first_pass_cache)
+  first_pass_prompt <- build_llm_annotation_prompt(markers, tissue, species)
+  first_pass_prompt_hash <- hash_text_md5(first_pass_prompt)
+  cached_first_pass <- read_llm_response_cache(
+    first_pass_cache,
+    expected_prompt_hash = first_pass_prompt_hash
+  )
 
   if (!is.null(cached_first_pass)) {
     method_res <- list(
       predictions = NULL,
       response_text = cached_first_pass$response_text %||% "",
-      prompt_text = "",
+      prompt_text = first_pass_prompt,
       runtime_sec = safe_usage_number(cached_first_pass$metadata$runtime_sec),
       cost_usd = safe_usage_number(cached_first_pass$metadata$cost_usd),
       tokens = safe_usage_number(cached_first_pass$metadata$tokens),
@@ -923,7 +1041,7 @@ run_llm_ablation_wrapper <- function(dataset_name,
         species = species,
         model_key = model_key,
         model_id = model_id,
-        prompt_hash = hash_text_md5(method_res$prompt_text %||% ""),
+        prompt_hash = first_pass_prompt_hash,
         runtime_sec = method_res$runtime_sec,
         tokens = method_res$tokens,
         prompt_tokens = method_res$prompt_tokens %||% NA_real_,
@@ -951,12 +1069,20 @@ run_llm_ablation_wrapper <- function(dataset_name,
     tissue = tissue,
     use_ontology_evidence = FALSE
   )
+  fixed_refinement_budget_k <- suppressWarnings(as.integer(fixed_refinement_budget_k %||% NA_integer_))
+  if (length(fixed_refinement_budget_k) == 0 || is.na(fixed_refinement_budget_k)) {
+    fixed_refinement_budget_k <- NULL
+  } else {
+    fixed_refinement_budget_k <- min(max(fixed_refinement_budget_k, 0), nrow(first_pass_evidence))
+  }
+  evidence_selection_budget <- fixed_refinement_budget_k %||% nrow(first_pass_evidence)
   evidence_clusters <- select_refinement_clusters(
     first_pass_evidence,
     selector = "evidence-k",
-    k = nrow(first_pass_evidence),
+    k = evidence_selection_budget,
     replicate = replicate,
-    dataset_name = dataset_name
+    dataset_name = dataset_name,
+    require_conflict = is.null(fixed_refinement_budget_k)
   )
   evidence_k <- length(evidence_clusters)
   no_ontology_clusters <- select_refinement_clusters(

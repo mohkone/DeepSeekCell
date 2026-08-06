@@ -1,0 +1,15 @@
+original_label,harmonized_label,exclude,reason
+alpha cell,Alpha cell,FALSE,
+beta cell,Beta cell,FALSE,
+delta cell,Delta cell,FALSE,
+gamma cell,Gamma cell,FALSE,
+epsilon cell,Epsilon cell,FALSE,
+acinar cell,Acinar cell,FALSE,
+ductal cell,Ductal cell,FALSE,
+endothelial cell,Endothelial cell,FALSE,
+PSC cell,Stellate cell,FALSE,
+mast cell,Immune cell,FALSE,
+MHC class II cell,Immune cell,FALSE,
+unclassified endocrine cell,Unknown,TRUE,unclassified_label
+unclassified cell,Unknown,TRUE,unclassified_label
+co-expression cell,Unknown,TRUE,ambiguous_or_mixed_label

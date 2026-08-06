@@ -93,6 +93,11 @@ unseen-tissue entries. Rows should remain `pending` or `planned` until local
 source files, label mappings, leakage flags, and eligibility decisions are
 fixed before inference.
 
+The first prepared pilot panel currently includes seven locked studies:
+BunisHSPC, SegerstolpePancreas, LawlorPancreas, XinPancreas, DarmanisBrain,
+PollenGlia, and WuKidneyHealthy. The panel is intentionally labelled a pilot
+until the larger 10-20 study confirmatory panel is prepared and frozen.
+
 ## Primary Endpoint
 
 The primary endpoint is correction efficiency under a matched refinement budget:
@@ -140,6 +145,14 @@ For every model-dataset-replicate block:
 6. Record selected clusters, reviewed clusters, label changes, confidence changes, tokens, latency, cost, and response hashes.
 
 Do not independently call the first-pass LLM for different ablation arms.
+
+By default, Evidence-k uses the locked deterministic conflict rule and may
+therefore refine zero clusters on an external dataset. For a fixed-budget audit
+of selector ranking quality, set either `DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_K`
+or `DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_FRACTION` before execution. Under
+that explicit audit mode, Evidence-k ranks all clusters by the frozen
+evidence-conflict priority rule and selects the top-k clusters so that all
+selectors receive the same non-zero budget.
 
 ## Statistical Analysis
 

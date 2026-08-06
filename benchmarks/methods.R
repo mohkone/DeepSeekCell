@@ -209,13 +209,9 @@ normalise_llm_cluster_id <- function(x) {
   x
 }
 
-run_llm_annotation <- function(markers_list,
-                               tissue,
-                               species,
-                               dataset_name,
-                               model_key,
-                               api_key,
-                               save_debug = TRUE) {
+build_llm_annotation_prompt <- function(markers_list,
+                                        tissue,
+                                        species) {
   clusters_text <- paste(
     sprintf(
       "%s: %s",
@@ -247,6 +243,7 @@ run_llm_annotation <- function(markers_list,
       "Beta cell: INS, IAPP, MAFA, PDX1.",
       "Delta cell: SST, HHEX.",
       "Gamma cell: PPY.",
+      "Epsilon cell: GHRL, MLN.",
       "Acinar cell: PRSS1, CPA1, CTRB1, AMY2A.",
       "Ductal cell: KRT19, SOX9, SPP1.",
       "Endothelial cell: PECAM1, VWF, KDR.",
@@ -258,6 +255,8 @@ run_llm_annotation <- function(markers_list,
       "Brain label guide:",
       "Excitatory neuron: SLC17A7, CAMK2A, SNAP25.",
       "Inhibitory neuron: GAD1, GAD2, SLC6A1.",
+      "Radial glia: HOPX, VIM, SOX2, PAX6, NES.",
+      "Neural progenitor cell: SOX2, NES, MKI67, TOP2A, PAX6.",
       "Astrocyte: AQP4, GFAP, ALDH1L1.",
       "Microglia: CX3CR1, C1QA, P2RY12.",
       "Oligodendrocyte: MBP, PLP1, MOG.",
@@ -283,10 +282,33 @@ run_llm_annotation <- function(markers_list,
       "Fibroblast: COL1A1, COL1A2, DCN, LUM.",
       sep = "\n"
     ),
+    `hematopoietic system` = paste(
+      "Hematopoietic label guide:",
+      "Hematopoietic stem/progenitor cell: CD34, PROM1, SPINK2, HLF, MEIS1, GATA2.",
+      "Common lymphoid progenitor: IL7R, DNTT, RAG1, RAG2, VPREB1, CD79A.",
+      "Granulocyte-monocyte progenitor: MPO, ELANE, AZU1, CTSG, PRTN3, LYZ.",
+      "Megakaryocyte-erythroid progenitor: GATA1, KLF1, GYPA, ALAS2, HBB, HBA1.",
+      "Erythroid progenitor cell: GATA1, KLF1, ALAS2, HBB, HBA1, HBA2, AHSP.",
+      sep = "\n"
+    ),
+    kidney = paste(
+      "Kidney label guide:",
+      "Proximal tubule cell: SLC34A1, SLC5A2, LRP2, CUBN, ALDOB, ACSM2, AQP1.",
+      "Distal convoluted tubule cell: SLC12A3, TRPM6, CALB1, PVALB, FXYD2.",
+      "Connecting tubule cell: CALB1, SCNN1G, TRPV5, FXYD4, KCNJ1.",
+      "Loop of Henle cell: SLC12A1, UMOD, CLDN10, KCNJ1, FXYD2.",
+      "Collecting duct principal cell: AQP2, AQP3, AQP4, SCNN1G, AVPR2.",
+      "Intercalated cell: ATP6V1B1, ATP6V0D2, SLC4A1, SLC26A4, FOXI1.",
+      "Podocyte: NPHS1, NPHS2, PODXL, WT1, SYNPO.",
+      "Mesangial cell: PDGFRB, MEIS1, POSTN, TAGLN, ACTA2.",
+      "Endothelial cell: PECAM1, VWF, KDR, EMCN, CLDN5.",
+      "Immune cell: LYZ, LAPTM5, PTPRC, CD68, C1QA.",
+      sep = "\n"
+    ),
     ""
   )
 
-  prompt <- sprintf(
+  sprintf(
     paste0(
       "You are annotating single-cell RNA-seq clusters.\n\n",
       "Species: %s\n",
@@ -316,6 +338,16 @@ run_llm_annotation <- function(markers_list,
     label_guide,
     clusters_text
   )
+}
+
+run_llm_annotation <- function(markers_list,
+                               tissue,
+                               species,
+                               dataset_name,
+                               model_key,
+                               api_key,
+                               save_debug = TRUE) {
+  prompt <- build_llm_annotation_prompt(markers_list, tissue, species)
 
   if (save_debug) {
     dir.create("benchmark_debug/prompts", recursive = TRUE, showWarnings = FALSE)
@@ -1117,6 +1149,7 @@ get_allowed_labels <- function(tissue) {
       "Beta cell",
       "Delta cell",
       "Gamma cell",
+      "Epsilon cell",
       "Acinar cell",
       "Ductal cell",
       "Endothelial cell",
@@ -1131,6 +1164,8 @@ get_allowed_labels <- function(tissue) {
     return(c(
       "Excitatory neuron",
       "Inhibitory neuron",
+      "Radial glia",
+      "Neural progenitor cell",
       "Astrocyte",
       "Microglia",
       "Oligodendrocyte",
@@ -1138,6 +1173,33 @@ get_allowed_labels <- function(tissue) {
       "Endothelial cell",
       "Pericyte",
       "Ependymal cell",
+      "Unknown"
+    ))
+  }
+
+  if (tissue %in% c("hematopoietic system", "hematopoietic", "hspc")) {
+    return(c(
+      "Hematopoietic stem/progenitor cell",
+      "Common lymphoid progenitor",
+      "Granulocyte-monocyte progenitor",
+      "Megakaryocyte-erythroid progenitor",
+      "Erythroid progenitor cell",
+      "Unknown"
+    ))
+  }
+
+  if (tissue == "kidney") {
+    return(c(
+      "Proximal tubule cell",
+      "Distal convoluted tubule cell",
+      "Connecting tubule cell",
+      "Loop of Henle cell",
+      "Collecting duct principal cell",
+      "Intercalated cell",
+      "Podocyte",
+      "Mesangial cell",
+      "Endothelial cell",
+      "Immune cell",
       "Unknown"
     ))
   }

@@ -162,6 +162,36 @@ external_dataset_scale <- function(data) {
   )
 }
 
+external_refinement_budget_k <- function(n_clusters) {
+  fixed_k <- Sys.getenv("DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_K", unset = "")
+  if (nzchar(fixed_k)) {
+    k <- suppressWarnings(as.integer(fixed_k))
+    if (!is.na(k)) {
+      return(min(max(k, 0), n_clusters))
+    }
+  }
+
+  fraction <- Sys.getenv("DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_FRACTION", unset = "")
+  if (!nzchar(fraction)) {
+    return(NULL)
+  }
+
+  fraction <- suppressWarnings(as.numeric(fraction))
+  if (is.na(fraction) || fraction <= 0) {
+    return(NULL)
+  }
+  fraction <- min(fraction, 1)
+  min_k <- suppressWarnings(as.integer(Sys.getenv(
+    "DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_MIN",
+    unset = "1"
+  )))
+  if (is.na(min_k)) {
+    min_k <- 1
+  }
+
+  min(max(ceiling(fraction * n_clusters), min_k), n_clusters)
+}
+
 add_external_dataset_scale <- function(x, scale) {
   if (!is.data.frame(x) || nrow(x) == 0) {
     return(x)
@@ -236,6 +266,9 @@ write_external_validation_lock <- function(manifest,
     risk_model_id = risk_model$model_id %||% NA_character_,
     risk_model_target = risk_model$target %||% NA_character_,
     risk_model_training_rows = risk_model$n_training_rows %||% NA_integer_,
+    external_refinement_budget_k = Sys.getenv("DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_K", unset = NA_character_),
+    external_refinement_budget_fraction = Sys.getenv("DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_FRACTION", unset = NA_character_),
+    external_refinement_budget_min = Sys.getenv("DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_MIN", unset = NA_character_),
     manifest_md5 = unname(tools::md5sum(attr(manifest, "manifest_path"))),
     datasets = manifest$Dataset,
     tissues = manifest$Tissue,
@@ -312,6 +345,7 @@ run_locked_external_validation <- function(manifest_path,
       row <- manifest[i, , drop = FALSE]
       dataset <- load_prepared_external_dataset(row)
       dataset_scale <- external_dataset_scale(dataset)
+      refinement_budget_k <- external_refinement_budget_k(length(dataset$markers))
       message("External validation replicate ", replicate, " - ", row$Dataset)
       result <- run_llm_ablation_wrapper(
         dataset_name = row$Dataset,
@@ -322,7 +356,8 @@ run_locked_external_validation <- function(manifest_path,
         api_key = api_key,
         method_prefix = MODELS[[model_key]]$name %||% model_key,
         cache_slug = paste0("external_", model_key),
-        include_full_refinement = TRUE
+        include_full_refinement = TRUE,
+        fixed_refinement_budget_k = refinement_budget_k
       )
       result$results$Replicate <- replicate
       result$results <- add_external_dataset_scale(result$results, dataset_scale)

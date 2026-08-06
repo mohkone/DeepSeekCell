@@ -1,0 +1,6 @@
+original_label,harmonized_label,exclude,reason
+HSC/MPP,Hematopoietic stem/progenitor cell,FALSE,
+CLP,Common lymphoid progenitor,FALSE,
+GMP,Granulocyte-monocyte progenitor,FALSE,
+MEP,Megakaryocyte-erythroid progenitor,FALSE,
+mid,Hematopoietic stem/progenitor cell,FALSE,study_intermediate_progenitor_label

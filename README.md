@@ -291,6 +291,20 @@ set DEEPSEEKCELL_RELIABILITY_MODEL=results/reliability_model_v1.1_error.rds
 Rscript benchmarks/run_external_validation.R benchmarks/external_validation_manifest.csv 3 deepseek
 ```
 
+For a compute-matched selector audit with a non-zero refinement budget on every
+external dataset, set either an explicit budget or a fixed fraction before the
+run:
+
+```bash
+set DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_FRACTION=0.2
+set DEEPSEEKCELL_EXTERNAL_REFINEMENT_BUDGET_MIN=1
+```
+
+When an explicit external budget is supplied, Evidence-k ranks all clusters by
+the frozen evidence-conflict priority rule and refines the top-k clusters. When
+no explicit budget is supplied, the default locked behaviour refines only
+clusters that satisfy the deterministic conflict rule.
+
 Each prepared external RDS should contain a named marker list `markers`, a named
 truth vector `truth`, and optional `tissue`, `species`, and `purity` fields. The
 runner preserves the paired design: one hashed first-pass response per
@@ -306,10 +320,23 @@ Rscript benchmarks/external_datasets/prepare_all_external_datasets.R \
   benchmarks/external_validation_manifest.csv
 ```
 
-Study-specific entrypoints are available for the initial planned panel:
-`prepare_wilk2020.R`, `prepare_segerstolpe2016.R`, and
-`prepare_motor_cortex2021.R`. The adapter protocol and leakage checks are
-documented in `benchmarks/external_datasets/adapter_protocol.md`.
+The registry supports local files and virtual `scRNAseq::...` sources. The
+initial locked pilot manifest contains seven independent prepared studies:
+`BunisHSPC`, `SegerstolpePancreas`, `LawlorPancreas`, `XinPancreas`,
+`DarmanisBrain`, `PollenGlia`, and `WuKidneyHealthy`. Additional planned
+candidates remain in the registry with `pending` or `planned` status until
+their source retrieval, label harmonization, and leakage audit are locked.
+
+To prepare only a selected subset from the registry, set:
+
+```bash
+set DEEPSEEKCELL_EXTERNAL_DATASETS=BunisHSPC,SegerstolpePancreas,WuKidneyHealthy
+```
+
+Study-specific label harmonization files are kept in
+`benchmarks/external_datasets/label_mappings/`. The adapter protocol and
+leakage checks are documented in
+`benchmarks/external_datasets/adapter_protocol.md`.
 
 The external-validation manifest also records study accession, source
 repository, center, laboratory, country, sequencing platform, chemistry,

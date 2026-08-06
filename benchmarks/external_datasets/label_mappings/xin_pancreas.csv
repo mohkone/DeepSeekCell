@@ -1,0 +1,9 @@
+original_label,harmonized_label,exclude,reason
+alpha,Alpha cell,FALSE,
+beta,Beta cell,FALSE,
+delta,Delta cell,FALSE,
+PP,Gamma cell,FALSE,
+alpha.contaminated,Unknown,TRUE,contaminated_label
+beta.contaminated,Unknown,TRUE,contaminated_label
+delta.contaminated,Unknown,TRUE,contaminated_label
+PP.contaminated,Unknown,TRUE,contaminated_label
