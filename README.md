@@ -188,6 +188,23 @@ single-tissue transfer matrices, learning curves, domain-shift summaries,
 oracle-gap analyses, calibration comparisons, and a failure taxonomy. The
 protocol is documented in `benchmarks/generalization_protocol.md`.
 
+Assess whether a single frozen Risk-k model transfers across annotation
+backends and LLM families with the universal reliability benchmark:
+
+```bash
+Rscript benchmarks/analyse_universal_reliability_transfer.R \
+  results/benchmark_debug \
+  results/reliability_model_v1.1_error.rds \
+  results/universal_reliability_transfer \
+  deepseek-chat
+```
+
+This writes risk-transfer AUROC, Brier, ECE, binary NLL, calibration bins,
+fixed-budget selector behaviour, selected-cluster overlap, degradation relative
+to the source model, and heatmap-ready PDFs. It reuses the same frozen Risk-k
+model without retraining or retuning. The protocol is documented in
+`benchmarks/universal_reliability_benchmark_protocol.md`.
+
 After a benchmark run, characterize when refinement is useful with the
 meta-benchmark workflow:
 
