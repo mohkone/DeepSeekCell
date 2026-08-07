@@ -8,7 +8,7 @@
 #' @param markers Named list of marker genes per cluster
 #' @param tissue Tissue name
 #' @param species Species (Human/Mouse/Rat)
-#' @param model_name Model to use ("deepseek" or "ollama")
+#' @param model_name Model backend to use ("deepseek", "openai", or "ollama")
 #' @param api_key API key for the selected model
 #' @param use_ontology Whether to map to Cell Ontology
 #' @param validate Whether to perform validation

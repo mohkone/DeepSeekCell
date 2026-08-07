@@ -30,21 +30,11 @@ call_llm_api <- function(prompt, model_key, api_key, max_retries = 3) {
   if (isTRUE(model$is_ollama)) {
     return(call_ollama_api(prompt, model, max_retries = max_retries))
   }
+  api_format <- model$api_format %||% "chat"
 
   for (attempt in seq_len(max_retries)) {
     res <- tryCatch({
-      body <- list(
-        model = model$model_id,
-        messages = list(
-          list(
-            role = "system",
-            content = "You are a bioinformatics expert. Output ONLY valid JSON. Do not include markdown or extra text."
-          ),
-          list(role = "user", content = prompt)
-        ),
-        temperature = model$temperature %||% 0,
-        max_tokens = model$max_tokens %||% 2000
-      )
+      body <- benchmark_llm_request_body(prompt, model, api_format)
 
       if (!is.null(model$top_p)) {
         body$top_p <- model$top_p
@@ -61,12 +51,8 @@ call_llm_api <- function(prompt, model_key, api_key, max_retries = 3) {
       resp <- httr2::req_perform(req)
       data <- httr2::resp_body_json(resp, simplifyVector = FALSE)
 
-      content <- data$choices[[1]]$message$content %||% ""
-      usage <- data$usage %||% list(
-        prompt_tokens = NA_real_,
-        completion_tokens = NA_real_,
-        total_tokens = NA_real_
-      )
+      content <- benchmark_llm_response_text(data, api_format)
+      usage <- benchmark_standardise_usage(data$usage %||% NULL, api_format)
 
       elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
 
@@ -99,6 +85,79 @@ call_llm_api <- function(prompt, model_key, api_key, max_retries = 3) {
     usage = list(prompt_tokens = 0, completion_tokens = 0, total_tokens = 0),
     runtime_sec = as.numeric(difftime(Sys.time(), start, units = "secs")),
     cost_usd = NA_real_
+  )
+}
+
+benchmark_llm_request_body <- function(prompt, model, api_format = "chat") {
+  system_prompt <- "You are a bioinformatics expert. Output ONLY valid JSON. Do not include markdown or extra text."
+
+  if (identical(api_format, "responses")) {
+    body <- list(
+      model = model$model_id,
+      instructions = system_prompt,
+      input = prompt,
+      max_output_tokens = model$max_tokens %||% 2000
+    )
+  } else {
+    body <- list(
+      model = model$model_id,
+      messages = list(
+        list(role = "system", content = system_prompt),
+        list(role = "user", content = prompt)
+      ),
+      temperature = model$temperature %||% 0,
+      max_tokens = model$max_tokens %||% 2000
+    )
+  }
+
+  body[!vapply(body, is.null, logical(1))]
+}
+
+benchmark_llm_response_text <- function(data, api_format = "chat") {
+  if (identical(api_format, "responses")) {
+    if (!is.null(data$output_text) && nzchar(data$output_text)) {
+      return(data$output_text)
+    }
+
+    pieces <- character()
+    for (item in data$output %||% list()) {
+      for (part in item$content %||% list()) {
+        text <- part$text %||% part$output_text %||% ""
+        if (nzchar(text)) pieces <- c(pieces, text)
+      }
+    }
+    return(paste(pieces, collapse = "\n"))
+  }
+
+  data$choices[[1]]$message$content %||% ""
+}
+
+benchmark_standardise_usage <- function(usage, api_format = "chat") {
+  if (is.null(usage)) {
+    return(list(
+      prompt_tokens = NA_real_,
+      completion_tokens = NA_real_,
+      total_tokens = NA_real_
+    ))
+  }
+
+  if (identical(api_format, "responses")) {
+    prompt_tokens <- usage$input_tokens %||% usage$prompt_tokens %||% NA_real_
+    completion_tokens <- usage$output_tokens %||% usage$completion_tokens %||% NA_real_
+  } else {
+    prompt_tokens <- usage$prompt_tokens %||% NA_real_
+    completion_tokens <- usage$completion_tokens %||% NA_real_
+  }
+  total_tokens <- usage$total_tokens %||% NA_real_
+  if (is.na(suppressWarnings(as.numeric(total_tokens)))) {
+    total_tokens <- suppressWarnings(as.numeric(prompt_tokens)) +
+      suppressWarnings(as.numeric(completion_tokens))
+  }
+
+  list(
+    prompt_tokens = prompt_tokens,
+    completion_tokens = completion_tokens,
+    total_tokens = total_tokens
   )
 }
 

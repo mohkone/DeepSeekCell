@@ -28,6 +28,25 @@ test_that("LLM JSON responses preserve ranked candidate labels", {
   expect_equal(parsed$CandidateCellTypes, "T cell; NK cell")
 })
 
+test_that("OpenAI Responses backend is configurable without network calls", {
+  model <- get_model_config("openai")
+
+  expect_equal(model$name, "OpenAI")
+  expect_equal(model$api_format, "responses")
+  expect_equal(model$api_key_env, "OPENAI_API_KEY")
+
+  response <- list(
+    output_text = "{\"annotations\":[]}",
+    usage = list(input_tokens = 12, output_tokens = 8, total_tokens = 20)
+  )
+  usage <- .standardise_llm_usage(response$usage, "responses")
+
+  expect_equal(.extract_llm_response_text(response, "responses"), "{\"annotations\":[]}")
+  expect_equal(usage$prompt_tokens, 12)
+  expect_equal(usage$completion_tokens, 8)
+  expect_equal(usage$total_tokens, 20)
+})
+
 test_that("marker input processing removes common low-value genes", {
   markers <- process_cell_data(list(Cluster1 = "CD3D, CD3E; MT-ATP6\nRPL13A CD8A"))$markers
 

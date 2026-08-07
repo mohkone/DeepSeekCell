@@ -5,12 +5,12 @@
 \alias{MODELS}
 \title{Unified API Handler for LLM Cell Type Annotation}
 \format{
-An object of class \code{list} of length 2.
+An object of class \code{list} of length 3.
 }
 \usage{
 MODELS
 }
 \description{
-Supports DeepSeek and local Ollama endpoints.
+Supports DeepSeek, OpenAI Responses, and local Ollama endpoints.
 }
 \keyword{datasets}

@@ -68,6 +68,13 @@ spec$model_defaults <- list(
     max_tokens = MODELS$ollama$max_tokens,
     api_url_env = MODELS$ollama$api_url_env,
     model_id_env = MODELS$ollama$model_id_env
+  ),
+  openai = list(
+    model_id = MODELS$openai$model_id,
+    temperature = MODELS$openai$temperature,
+    max_tokens = MODELS$openai$max_tokens,
+    api_url_env = MODELS$openai$api_url_env,
+    model_id_env = MODELS$openai$model_id_env
   )
 )
 spec$development_benchmark <- list(

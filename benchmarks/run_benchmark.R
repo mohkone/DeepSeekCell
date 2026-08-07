@@ -1482,14 +1482,20 @@ run_replicated_benchmark <- function(n_replicates = 1,
       for (m in methods_list) {
         cat("\n--- Replicate", rep, "-", m, "on", ds, "---\n")
 
-        is_llm_ablation <- m %in% c("DeepSeek", "Ollama")
-        api_key <- if (identical(m, "DeepSeek")) {
-          deepseek_key
+        is_llm_ablation <- m %in% c("DeepSeek", "OpenAI", "Ollama")
+        model_key <- if (is_llm_ablation) llm_method_model_key(m) else NA_character_
+        model_config <- if (is_llm_ablation) MODELS[[model_key]] else NULL
+        api_key <- if (is_llm_ablation) {
+          llm_method_api_key(m, deepseek_key = deepseek_key)
         } else {
           NULL
         }
 
-        if (m == "DeepSeek" && (is.null(api_key) || api_key == "")) {
+        if (
+          is_llm_ablation &&
+            isTRUE(model_config$requires_api_key) &&
+            (is.null(api_key) || identical(api_key, ""))
+        ) {
           cat("Skipping ", m, ": API key not set.\n", sep = "")
           next
         }
@@ -1500,7 +1506,6 @@ run_replicated_benchmark <- function(n_replicates = 1,
         }
 
         if (is_llm_ablation) {
-          model_key <- tolower(m)
           include_full_refinement <- !identical(model_key, "ollama") ||
             include_ollama_full_refinement()
           ablation <- tryCatch(
@@ -2040,6 +2045,38 @@ plot_refinement_efficiency <- function(refinement_summary,
   invisible(p)
 }
 
+llm_method_model_key <- function(method) {
+  switch(
+    method,
+    DeepSeek = "deepseek",
+    OpenAI = "openai",
+    Ollama = "ollama",
+    tolower(method)
+  )
+}
+
+llm_method_api_key <- function(method, deepseek_key = Sys.getenv("DEEPSEEK_API_KEY")) {
+  model_key <- llm_method_model_key(method)
+  model <- MODELS[[model_key]]
+  if (is.null(model)) {
+    return(NULL)
+  }
+
+  explicit <- if (identical(model_key, "deepseek")) deepseek_key else NULL
+  if (!is.null(explicit) && nzchar(explicit)) {
+    return(explicit)
+  }
+
+  for (env_name in model$api_key_env %||% character()) {
+    value <- Sys.getenv(env_name, unset = "")
+    if (nzchar(value)) {
+      return(value)
+    }
+  }
+
+  NULL
+}
+
 write_benchmark_manifest <- function(results,
                                      methods,
                                      n_replicates,
@@ -2058,7 +2095,7 @@ write_benchmark_manifest <- function(results,
     "",
     "Interpretation notes:",
     "- DeepSeekCell is evaluated as a closed-label, marker-guided annotation workflow.",
-    "- DeepSeek ablations are paired: one first-pass raw response is cached and reused for all DeepSeekCell ablation arms.",
+    "- LLM ablations are paired: one first-pass raw response is cached and reused for all selector arms from the same backend, dataset, and replicate.",
     "- DeepSeekCell-Evidence adds deterministic evidence fields without changing labels or confidence.",
     "- DeepSeekCell-Calibrated changes confidence but not labels.",
     "- DeepSeekCell-RandomK, DeepSeekCell-ConfidenceK, DeepSeekCell-NoOntologyK, DeepSeekCell-SelfRefined, and DeepSeekCell-FullRefined are allowed to change labels through second-pass refinement.",
@@ -2087,8 +2124,14 @@ write_benchmark_manifest <- function(results,
 
 available_benchmark_methods <- function(requested_methods) {
   selected <- character()
+  known_methods <- c("DeepSeek", "OpenAI", "Ollama", "scType", "SingleR", "scmap", "CellTypist")
 
   for (method in requested_methods) {
+    if (!method %in% known_methods) {
+      message("Skipping unknown benchmark method: ", method)
+      next
+    }
+
     if (identical(method, "scmap") && !is_scmap_available()) {
       message("Skipping scmap: Bioconductor package scmap is not installed.")
       next
@@ -2099,6 +2142,11 @@ available_benchmark_methods <- function(requested_methods) {
         "Skipping CellTypist: reticulate or Python modules ",
         "celltypist/anndata/numpy are not available."
       )
+      next
+    }
+
+    if (identical(method, "OpenAI") && is.null(llm_method_api_key("OpenAI"))) {
+      message("Skipping OpenAI: OPENAI_API_KEY is not set.")
       next
     }
 

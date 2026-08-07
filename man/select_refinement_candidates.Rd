@@ -29,17 +29,16 @@ selects all evidence-conflicted clusters; Risk-k, Confidence-k and Random-k
 use the number of evidence-conflicted clusters as their matched budget; Full
 selects all clusters.}
 
-\item{strategy}{One of \code{"evidence"}, \code{"risk"}, \code{"confidence"},
-\code{"random"}, \code{"full"}, or \code{"none"}.}
+\item{strategy}{One of \code{"evidence"}, \code{"risk"}, \code{"confidence"}, \code{"random"},
+\code{"full"}, or \code{"none"}.}
 
 \item{use_ontology_evidence}{Whether ontology evidence contributes when
 evidence scores must be computed.}
 
 \item{seed}{Optional random seed for Random-k selection.}
 
-\item{reliability_model}{Optional model from
-\code{\link[=train_reliability_model]{train_reliability_model()}} used by
-Risk-k selection. If omitted, annotations must already contain
+\item{reliability_model}{Optional model from \code{\link[=train_reliability_model]{train_reliability_model()}} used
+by Risk-k selection. If omitted, annotations must already contain
 \code{PredictedReliabilityRisk}, \code{PredictedErrorRisk}, or
 \code{PredictedRefinementBenefit}.}
 }
@@ -51,6 +50,6 @@ and \code{SelectionRank} columns.
 Selects which first-pass annotations should receive an optional second LLM
 pass. Evidence-k ranks clusters by deterministic marker/evidence conflict,
 Risk-k ranks clusters by a learned reliability model, Confidence-k ranks by
-low raw LLM confidence, Random-k samples a matched number of clusters, and Full
-selects every cluster.
+low raw LLM confidence, Random-k samples a matched number of clusters, and
+Full selects every cluster.
 }

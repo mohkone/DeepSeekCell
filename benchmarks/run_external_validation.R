@@ -305,10 +305,23 @@ write_external_validation_lock <- function(manifest,
 run_locked_external_validation <- function(manifest_path,
                                            n_replicates = 1,
                                            model_key = "deepseek",
-                                           api_key = Sys.getenv("DEEPSEEK_API_KEY")) {
+                                           api_key = NULL) {
   spec <- load_locked_spec()
   manifest <- validate_external_manifest(manifest_path)
   attr(manifest, "manifest_path") <- manifest_path
+  model_config <- MODELS[[model_key]]
+  if (is.null(model_config)) {
+    stop("Unknown model_key: ", model_key, call. = FALSE)
+  }
+  if (is.null(api_key) || identical(api_key, "")) {
+    for (env_name in model_config$api_key_env %||% character()) {
+      value <- Sys.getenv(env_name, unset = "")
+      if (nzchar(value)) {
+        api_key <- value
+        break
+      }
+    }
+  }
 
   write_external_validation_lock(manifest, spec)
   utils::write.csv(
@@ -323,6 +336,18 @@ run_locked_external_validation <- function(manifest_path,
     message("Preflight complete. Set DEEPSEEKCELL_RUN_EXTERNAL_VALIDATION=true to execute.")
     message("Prepared RDS available for ", sum(manifest$PreparedRdsExists), " of ", nrow(manifest), " dataset(s).")
     return(invisible(list(spec = spec, manifest = manifest)))
+  }
+
+  if (
+    isTRUE(model_config$requires_api_key) &&
+      (is.null(api_key) || identical(api_key, ""))
+  ) {
+    env_hint <- paste(model_config$api_key_env %||% character(), collapse = ", ")
+    stop(
+      "API key is required for model: ", model_config$name,
+      if (nzchar(env_hint)) paste0(". Set one of: ", env_hint) else "",
+      call. = FALSE
+    )
   }
 
   if (!all(manifest$PreparedRdsExists)) {
@@ -354,7 +379,7 @@ run_locked_external_validation <- function(manifest_path,
         replicate = replicate,
         model_key = model_key,
         api_key = api_key,
-        method_prefix = MODELS[[model_key]]$name %||% model_key,
+        method_prefix = model_config$name %||% model_key,
         cache_slug = paste0("external_", model_key),
         include_full_refinement = TRUE,
         fixed_refinement_budget_k = refinement_budget_k

@@ -11,10 +11,10 @@ budget. The learned Risk-k extension trains a reliability model to estimate
 first-pass error risk or expected refinement benefit and ranks clusters under
 the same fixed-budget objective.
 
-The software still includes DeepSeek and local Ollama backends plus a Shiny
-interface, but the main contribution is the model-agnostic formulation of
-selective LLM refinement as a reliability and resource-allocation problem
-rather than any single LLM or interface.
+The software still includes DeepSeek, OpenAI-compatible Responses API, and
+local Ollama backends plus a Shiny interface, but the main contribution is the
+model-agnostic formulation of selective LLM refinement as a reliability and
+resource-allocation problem rather than any single LLM or interface.
 
 Current software version: `0.1.0`.
 
@@ -29,7 +29,7 @@ clusters manually. DeepSeekCell addresses the fixed-budget question:
 
 ## Algorithmic Components
 
-- Candidate generation from per-cluster marker genes using DeepSeek or local Ollama.
+- Candidate generation from per-cluster marker genes using DeepSeek, OpenAI-compatible Responses API, or local Ollama.
 - Deterministic marker-profile evidence scoring.
 - Cell Ontology validation with exact, synonym, context-aware, and conservative fuzzy matching provenance.
 - Tissue-consistency and marker-prediction consensus scoring.
@@ -83,14 +83,18 @@ Set keys as environment variables instead of storing them in scripts:
 
 ```r
 Sys.setenv(DEEPSEEK_API_KEY = "...")
+Sys.setenv(OPENAI_API_KEY = "...")
 ```
 
 Supported endpoint overrides:
 
 - `DEEPSEEK_API_URL`, `DEEPSEEK_MODEL_ID`
+- `OPENAI_API_URL`, `OPENAI_MODEL_ID`
 - `OLLAMA_API_URL`, `OLLAMA_MODEL_ID`
 
-Ollama can be used without an API key when a local server is running.
+OpenAI defaults to the Responses API endpoint and a configurable model ID
+(`OPENAI_MODEL_ID`, default `gpt-5`). Ollama can be used without an API key
+when a local server is running.
 
 ## R Usage
 
@@ -120,6 +124,10 @@ result <- annotate_cell_types(
 result$annotations
 generate_html_report(result, "annotation_report.html")
 ```
+
+To run the same annotation call through an OpenAI-compatible frontier model,
+set `OPENAI_API_KEY` and use `model_name = "openai"`. Override
+`OPENAI_MODEL_ID` before the run when a different model identifier is required.
 
 Use `select_refinement_candidates()` directly when you want to audit or compare
 selectors without making a second LLM call:
@@ -258,6 +266,18 @@ by majority vote only as a secondary harmonized comparison.
 Set `DEEPSEEK_API_KEY` to include DeepSeekCell; otherwise only non-LLM
 baselines that do not require an API key will run.
 
+To add an OpenAI/GPT-style backend to the same paired benchmark, set the
+OpenAI key/model and list `OpenAI` as an extra LLM method. The benchmark
+manifest records the exact model ID and cached response hashes:
+
+```bash
+set OPENAI_API_KEY=...
+set OPENAI_MODEL_ID=gpt-5
+set DEEPSEEKCELL_EXTRA_LLM_METHODS=OpenAI
+set DEEPSEEKCELL_USE_LLM_CACHE=true
+Rscript benchmarks/run_benchmark.R
+```
+
 The benchmark also writes paired ablation, calibration, selector-efficiency,
 stability, runtime, cost, token, and statistical summaries including
 `benchmark_pairwise_wilcoxon.csv`, `benchmark_friedman_tests.csv`,
@@ -306,6 +326,17 @@ locked validation after the prepared RDS paths are available:
 set DEEPSEEKCELL_RUN_EXTERNAL_VALIDATION=true
 set DEEPSEEKCELL_RELIABILITY_MODEL=results/reliability_model_v1.1_error.rds
 Rscript benchmarks/run_external_validation.R benchmarks/external_validation_manifest.csv 3 deepseek
+```
+
+Use `openai` as the third argument to run the identical locked external
+validation with the OpenAI backend:
+
+```bash
+set OPENAI_API_KEY=...
+set OPENAI_MODEL_ID=gpt-5
+set DEEPSEEKCELL_RUN_EXTERNAL_VALIDATION=true
+set DEEPSEEKCELL_RELIABILITY_MODEL=results/reliability_model_v1.1_error.rds
+Rscript benchmarks/run_external_validation.R benchmarks/external_validation_manifest.csv 3 openai
 ```
 
 For a compute-matched selector audit with a non-zero refinement budget on every

@@ -18,6 +18,7 @@ MODELS <- list(
     input_cost_per_1k = 0.00014,
     output_cost_per_1k = 0.00028,
     requires_api_key = TRUE,
+    api_key_env = "DEEPSEEK_API_KEY",
     is_ollama = FALSE
   ),
   ollama = list(
@@ -31,7 +32,23 @@ MODELS <- list(
     input_cost_per_1k = 0,
     output_cost_per_1k = 0,
     requires_api_key = FALSE,
+    api_key_env = character(),
     is_ollama = TRUE
+  ),
+  openai = list(
+    name = "OpenAI",
+    api_url = "https://api.openai.com/v1/responses",
+    api_url_env = "OPENAI_API_URL",
+    model_id = "gpt-5",
+    model_id_env = "OPENAI_MODEL_ID",
+    max_tokens = 2000,
+    temperature = NULL,
+    input_cost_per_1k = 0,
+    output_cost_per_1k = 0,
+    requires_api_key = TRUE,
+    api_key_env = "OPENAI_API_KEY",
+    is_ollama = FALSE,
+    api_format = "responses"
   )
 )
 

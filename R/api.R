@@ -1,7 +1,7 @@
 # R/api.R
 #' Unified API Handler for LLM Cell Type Annotation
 #'
-#' Supports DeepSeek and local Ollama endpoints.
+#' Supports DeepSeek, OpenAI Responses, and local Ollama endpoints.
 #'
 #' @importFrom httr2 request req_headers req_body_json req_perform resp_body_json req_timeout
 #' @importFrom jsonlite fromJSON
@@ -32,6 +32,20 @@ MODELS <- list(
     requires_api_key = FALSE,
     api_key_env = character(),
     is_ollama = TRUE
+  ),
+  openai = list(
+    name = "OpenAI",
+    api_url = "https://api.openai.com/v1/responses",
+    api_url_env = "OPENAI_API_URL",
+    model_id = "gpt-5",
+    model_id_env = "OPENAI_MODEL_ID",
+    max_tokens = 2000,
+    temperature = NULL,
+    cost_per_1k_tokens = 0,
+    requires_api_key = TRUE,
+    api_key_env = "OPENAI_API_KEY",
+    is_ollama = FALSE,
+    api_format = "responses"
   )
 )
 
@@ -102,6 +116,10 @@ call_llm_api <- function(prompt,
                          max_retries = 3,
                          timeout_sec = 60) {
   stopifnot(is.character(prompt), length(prompt) == 1)
+
+  if (is.character(model) && length(model) == 1) {
+    model <- get_model_config(model)
+  }
   
   if (isTRUE(model$is_ollama)) {
     return(call_ollama_api(prompt, model, max_retries, timeout_sec))
@@ -118,6 +136,7 @@ call_llm_api <- function(prompt,
   
   start_time <- Sys.time()
   last_error <- NULL
+  api_format <- model$api_format %||% "chat"
   
   for (attempt in seq_len(max_retries)) {
     response <- tryCatch({
@@ -127,27 +146,16 @@ call_llm_api <- function(prompt,
           Authorization = paste("Bearer", api_key),
           "Content-Type" = "application/json"
         ) |>
-        httr2::req_body_json(list(
-          model = model$model_id,
-          messages = list(
-            list(role = "system", content = create_system_prompt()),
-            list(role = "user", content = prompt)
-          ),
-          temperature = model$temperature,
-          max_tokens = model$max_tokens
-        ))
+        httr2::req_body_json(.llm_request_body(prompt, model, api_format))
       
       resp <- httr2::req_perform(req)
       data <- httr2::resp_body_json(resp, simplifyVector = FALSE)
       
-      content <- data$choices[[1]]$message$content %||% ""
-      usage <- data$usage %||% list(
-        prompt_tokens = NA_integer_,
-        completion_tokens = NA_integer_,
-        total_tokens = NA_integer_
-      )
+      content <- .extract_llm_response_text(data, api_format)
+      usage <- .standardise_llm_usage(data$usage %||% NULL, api_format)
       
       elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+      tokens <- .api_safe_token_count(usage$total_tokens %||% 0)
       
       list(
         success = TRUE,
@@ -155,6 +163,8 @@ call_llm_api <- function(prompt,
         usage = usage,
         model = model$name,
         latency_sec = elapsed,
+        runtime_sec = elapsed,
+        cost_usd = (tokens / 1000) * (model$cost_per_1k_tokens %||% 0),
         attempt = attempt
       )
     }, error = function(e) {
@@ -176,8 +186,90 @@ call_llm_api <- function(prompt,
     usage = list(total_tokens = 0),
     model = model$name,
     latency_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+    runtime_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+    cost_usd = 0,
     attempt = max_retries
   )
+}
+
+.llm_request_body <- function(prompt, model, api_format = "chat") {
+  if (identical(api_format, "responses")) {
+    body <- list(
+      model = model$model_id,
+      instructions = create_system_prompt(),
+      input = prompt,
+      max_output_tokens = model$max_tokens
+    )
+  } else {
+    body <- list(
+      model = model$model_id,
+      messages = list(
+        list(role = "system", content = create_system_prompt()),
+        list(role = "user", content = prompt)
+      ),
+      temperature = model$temperature,
+      max_tokens = model$max_tokens
+    )
+  }
+
+  body[!vapply(body, is.null, logical(1))]
+}
+
+.extract_llm_response_text <- function(data, api_format = "chat") {
+  if (identical(api_format, "responses")) {
+    if (!is.null(data$output_text) && nzchar(data$output_text)) {
+      return(data$output_text)
+    }
+
+    pieces <- character()
+    output <- data$output %||% list()
+    for (item in output) {
+      content <- item$content %||% list()
+      for (part in content) {
+        text <- part$text %||% part$output_text %||% ""
+        if (nzchar(text)) pieces <- c(pieces, text)
+      }
+    }
+    return(paste(pieces, collapse = "\n"))
+  }
+
+  data$choices[[1]]$message$content %||% ""
+}
+
+.standardise_llm_usage <- function(usage, api_format = "chat") {
+  if (is.null(usage)) {
+    return(list(
+      prompt_tokens = NA_integer_,
+      completion_tokens = NA_integer_,
+      total_tokens = NA_integer_
+    ))
+  }
+
+  if (identical(api_format, "responses")) {
+    prompt_tokens <- usage$input_tokens %||% usage$prompt_tokens %||% NA_integer_
+    completion_tokens <- usage$output_tokens %||% usage$completion_tokens %||% NA_integer_
+  } else {
+    prompt_tokens <- usage$prompt_tokens %||% NA_integer_
+    completion_tokens <- usage$completion_tokens %||% NA_integer_
+  }
+
+  total_tokens <- usage$total_tokens %||% NA_integer_
+  if (is.na(suppressWarnings(as.numeric(total_tokens)))) {
+    total_tokens <- suppressWarnings(as.numeric(prompt_tokens)) +
+      suppressWarnings(as.numeric(completion_tokens))
+  }
+
+  list(
+    prompt_tokens = prompt_tokens,
+    completion_tokens = completion_tokens,
+    total_tokens = total_tokens
+  )
+}
+
+.api_safe_token_count <- function(x) {
+  out <- suppressWarnings(as.numeric(x %||% 0))
+  out[is.na(out)] <- 0
+  sum(out)
 }
 
 #' Call local Ollama API
@@ -220,6 +312,8 @@ call_ollama_api <- function(prompt,
         ),
         model = model$name,
         latency_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+        runtime_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+        cost_usd = 0,
         attempt = attempt
       )
     }, error = function(e) {
@@ -238,6 +332,8 @@ call_ollama_api <- function(prompt,
     usage = list(total_tokens = 0),
     model = model$name,
     latency_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+    runtime_sec = as.numeric(difftime(Sys.time(), start_time, units = "secs")),
+    cost_usd = 0,
     attempt = max_retries
   )
 }

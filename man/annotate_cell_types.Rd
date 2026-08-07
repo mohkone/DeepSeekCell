@@ -31,7 +31,7 @@ annotate_cell_types(
 
 \item{species}{Species (Human/Mouse/Rat)}
 
-\item{model_name}{Model to use ("deepseek" or "ollama")}
+\item{model_name}{Model backend to use ("deepseek", "openai", or "ollama")}
 
 \item{api_key}{API key for the selected model}
 
@@ -54,8 +54,9 @@ evidence-adjusted confidence while preserving LLMConfidence.}
 FullRefined, or \code{"none"} to disable selection.}
 
 \item{refinement_budget}{Maximum number of clusters to refine. If \code{NULL},
-Evidence-k refines all evidence-conflicted clusters, Risk-k, Confidence-k and
-Random-k use the same matched budget, and FullRefined refines all clusters.}
+Evidence-k refines all evidence-conflicted clusters, Risk-k, Confidence-k
+and Random-k use the same matched budget, and FullRefined refines all
+clusters.}
 
 \item{use_ontology_evidence}{Whether ontology mapping contributes to
 evidence-adjusted confidence and conflict detection.}
