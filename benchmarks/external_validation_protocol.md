@@ -162,9 +162,23 @@ Use dataset-replicate blocks as the primary paired unit. Report:
 - Paired Wilcoxon signed-rank tests for Risk-k versus Evidence-k, Random-k and Confidence-k.
 - Effect sizes for paired differences.
 - False-discovery-rate correction for families of secondary tests.
+- Random-effects cross-study meta-analysis for correction efficiency,
+  recovery, calibration improvement, runtime, token use, and API-cost
+  reduction.
+- Cochran's Q, tau-squared, and I2 heterogeneity estimates for pooled
+  study-level effects.
 
 Replicate-level results should be interpreted as stability evidence, not as
 fully independent biological datasets.
+
+After a completed external-validation run, generate these pooled summaries with:
+
+```bash
+Rscript benchmarks/analyse_external_validation_meta_analysis.R \
+  results/external_validation_refinement_behavior.csv \
+  results/external_validation_confidence_quality.csv \
+  results/external_validation_meta_analysis
+```
 
 ## Sensitivity Analyses
 

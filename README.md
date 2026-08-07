@@ -352,6 +352,20 @@ Rscript benchmarks/analyse_external_validation_robustness.R \
   results/external_validation_robustness
 ```
 
+After the external panel is complete, pool selector effects and calibration
+changes across studies with a random-effects meta-analysis:
+
+```bash
+Rscript benchmarks/analyse_external_validation_meta_analysis.R \
+  results/external_validation_refinement_behavior.csv \
+  results/external_validation_confidence_quality.csv \
+  results/external_validation_meta_analysis
+```
+
+The meta-analysis writes study-level effects, random-effects pooled estimates,
+Cochran's Q, I2 heterogeneity estimates, selector contrasts, calibration
+improvement summaries, cost-reduction summaries, and a selector forest plot.
+
 Secondary robustness checks can be run with:
 
 ```bash
