@@ -163,6 +163,17 @@ run_reproducibility_bundle <- function(output_prefix = file.path("results", "sub
     )
   )
   steps[[length(steps) + 1]] <- run_step(
+    "biological_validation",
+    rscript,
+    c(
+      "benchmarks/analyse_biological_validation.R",
+      "results/benchmark_debug",
+      "benchmarks/external_validation_manifest.csv",
+      "results/biological_validation"
+    ),
+    env = c("DEEPSEEKCELL_ENABLE_GO_ENRICHMENT=false")
+  )
+  steps[[length(steps) + 1]] <- run_step(
     "universal_reliability_transfer",
     rscript,
     c(
@@ -196,6 +207,10 @@ run_reproducibility_bundle <- function(output_prefix = file.path("results", "sub
     "results/external_validation_meta_analysis_selector_contrast_pooled_effects.csv",
     "results/external_validation_robustness_dataset_scorecard.csv",
     "results/external_validation_selector_inference_paired_selector_inference.csv",
+    "results/biological_validation_cluster_biological_validation.csv",
+    "results/biological_validation_summary_by_method.csv",
+    "results/biological_validation_corrected_clusters.csv",
+    "results/biological_validation_failure_taxonomy.csv",
     "results/universal_reliability_transfer_risk_transfer_metrics.csv",
     "results/universal_reliability_transfer_selector_summary_by_model.csv",
     "results/benchmark_release_manifest.csv",

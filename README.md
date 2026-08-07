@@ -401,6 +401,23 @@ The table reports both gross correction efficiency
 (`(WrongToCorrect - CorrectToWrong) / NRefined`), with the latter penalizing
 harmful revisions.
 
+To assess whether refined labels are biologically more plausible, run:
+
+```bash
+Rscript benchmarks/analyse_biological_validation.R \
+  results/benchmark_debug \
+  benchmarks/external_validation_manifest.csv \
+  results/biological_validation
+```
+
+This writes per-cluster biological validation, corrected-cluster case studies,
+method summaries, and a failure taxonomy using canonical marker recovery,
+marker-derived differential-expression agreement, Cell Ontology hierarchy
+consistency, lineage consistency, and profile-program consistency. Optional GO
+biological-process enrichment can be enabled with
+`DEEPSEEKCELL_ENABLE_GO_ENRICHMENT=true` when `clusterProfiler`,
+`AnnotationDbi`, and the appropriate organism annotation package are installed.
+
 Secondary robustness checks can be run with:
 
 ```bash
@@ -430,8 +447,9 @@ Rscript benchmarks/reproduce_submission_bundle.R
 ```
 
 This command rebuilds the external meta-analysis, robustness summaries, paired
-selector inference, universal reliability transfer tables, release manifest,
-and a machine-readable reproducibility report. Set
+selector inference, biological validation summaries, universal reliability
+transfer tables, release manifest, and a machine-readable reproducibility
+report. Set
 `DEEPSEEKCELL_REPRODUCE_RUN_TESTS=true` to include `devtools::test()` in the
 same run.
 

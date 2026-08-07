@@ -197,6 +197,23 @@ Rscript benchmarks/analyse_selector_inference.R \
   results/external_validation_selector_inference
 ```
 
+After statistical summaries are generated, evaluate biological plausibility of
+label changes and corrected clusters with:
+
+```bash
+Rscript benchmarks/analyse_biological_validation.R \
+  results/benchmark_debug \
+  benchmarks/external_validation_manifest.csv \
+  results/biological_validation
+```
+
+The analysis reports canonical marker recovery, marker-derived
+differential-expression agreement, Cell Ontology hierarchy consistency, lineage
+consistency, profile-program consistency, corrected-cluster case studies, and a
+failure taxonomy. GO biological-process enrichment is optional and must be
+enabled explicitly with `DEEPSEEKCELL_ENABLE_GO_ENRICHMENT=true` when the
+required Bioconductor annotation packages are installed.
+
 ## Sensitivity Analyses
 
 Sensitivity analyses are secondary robustness checks and must not be used to
