@@ -321,11 +321,13 @@ Rscript benchmarks/external_datasets/prepare_all_external_datasets.R \
 ```
 
 The registry supports local files and virtual `scRNAseq::...` sources. The
-initial locked pilot manifest contains seven independent prepared studies:
-`BunisHSPC`, `SegerstolpePancreas`, `LawlorPancreas`, `XinPancreas`,
-`DarmanisBrain`, `PollenGlia`, and `WuKidneyHealthy`. Additional planned
-candidates remain in the registry with `pending` or `planned` status until
-their source retrieval, label harmonization, and leakage audit are locked.
+expanded locked pilot manifest currently contains eleven independent prepared
+studies: `BunisHSPC`, `SegerstolpePancreas`, `LawlorPancreas`,
+`XinPancreas`, `DarmanisBrain`, `PollenGlia`, `WuKidneyHealthy`,
+`NowakowskiCortex`, `MarquesBrain`, `RomanovBrain`, and
+`ZhongPrefrontal`. Additional planned candidates remain in the registry with
+`pending` or `planned` status until their source retrieval, label
+harmonization, and leakage audit are locked.
 
 To prepare only a selected subset from the registry, set:
 

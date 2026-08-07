@@ -1,0 +1,14 @@
+original_label,harmonized_label,exclude,reason
+OPC,Oligodendrocyte precursor cell,FALSE,
+COP,Oligodendrocyte precursor cell,FALSE,committed_oligodendrocyte_precursor
+NFOL1,Oligodendrocyte,FALSE,newly_formed_oligodendrocyte
+NFOL2,Oligodendrocyte,FALSE,newly_formed_oligodendrocyte
+MFOL1,Oligodendrocyte,FALSE,myelin_forming_oligodendrocyte
+MFOL2,Oligodendrocyte,FALSE,myelin_forming_oligodendrocyte
+MOL1,Oligodendrocyte,FALSE,mature_oligodendrocyte
+MOL2,Oligodendrocyte,FALSE,mature_oligodendrocyte
+MOL3,Oligodendrocyte,FALSE,mature_oligodendrocyte
+MOL4,Oligodendrocyte,FALSE,mature_oligodendrocyte
+MOL5,Oligodendrocyte,FALSE,mature_oligodendrocyte
+MOL6,Oligodendrocyte,FALSE,mature_oligodendrocyte
+PPR,Unknown,TRUE,unsupported_or_ambiguous_non_oligodendrocyte_label

@@ -93,10 +93,11 @@ unseen-tissue entries. Rows should remain `pending` or `planned` until local
 source files, label mappings, leakage flags, and eligibility decisions are
 fixed before inference.
 
-The first prepared pilot panel currently includes seven locked studies:
+The expanded prepared pilot panel currently includes eleven locked studies:
 BunisHSPC, SegerstolpePancreas, LawlorPancreas, XinPancreas, DarmanisBrain,
-PollenGlia, and WuKidneyHealthy. The panel is intentionally labelled a pilot
-until the larger 10-20 study confirmatory panel is prepared and frozen.
+PollenGlia, WuKidneyHealthy, NowakowskiCortex, MarquesBrain, RomanovBrain,
+and ZhongPrefrontal. The panel is intentionally labelled a pilot until the
+larger 10-20 study confirmatory panel is prepared, frozen, and fully evaluated.
 
 ## Primary Endpoint
 

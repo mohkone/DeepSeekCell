@@ -1,0 +1,7 @@
+original_label,harmonized_label,exclude,reason
+Astrocytes,Astrocyte,FALSE,
+GABAergic neurons,Inhibitory neuron,FALSE,
+Microglia,Microglia,FALSE,
+Neurons,Unknown,TRUE,broad_neuron_label_without_excitatory_inhibitory_resolution
+OPC,Oligodendrocyte precursor cell,FALSE,
+Stem cells,Neural progenitor cell,FALSE,

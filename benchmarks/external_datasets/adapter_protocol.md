@@ -70,6 +70,10 @@ XinPancreas
 DarmanisBrain
 PollenGlia
 WuKidneyHealthy
+NowakowskiCortex
+MarquesBrain
+RomanovBrain
+ZhongPrefrontal
 ```
 
 Large or unresolved candidates remain in the registry with `pending` or

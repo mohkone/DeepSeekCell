@@ -1,0 +1,8 @@
+original_label,harmonized_label,exclude,reason
+astrocytes,Astrocyte,FALSE,
+endothelial,Endothelial cell,FALSE,
+ependymal,Ependymal cell,FALSE,
+microglia,Microglia,FALSE,
+neurons,Unknown,TRUE,broad_neuron_label_without_excitatory_inhibitory_resolution
+oligos,Oligodendrocyte,FALSE,
+vsm,Pericyte,FALSE,vascular_mural_cell
