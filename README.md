@@ -385,6 +385,22 @@ The meta-analysis writes study-level effects, random-effects pooled estimates,
 Cochran's Q, I2 heterogeneity estimates, selector contrasts, calibration
 improvement summaries, cost-reduction summaries, and a selector forest plot.
 
+For formal paired inference on fixed-budget selector contrasts, run:
+
+```bash
+Rscript benchmarks/analyse_selector_inference.R \
+  results/external_validation_refinement_behavior.csv \
+  results/external_validation_selector_inference
+```
+
+This writes bootstrap confidence intervals over dataset-replicate blocks,
+paired sign-flip permutation tests, paired Wilcoxon tests, effect-size
+summaries, false-discovery-rate adjusted p-values, and a contrast forest plot.
+The table reports both gross correction efficiency
+(`WrongToCorrect / NRefined`) and net correction efficiency
+(`(WrongToCorrect - CorrectToWrong) / NRefined`), with the latter penalizing
+harmful revisions.
+
 Secondary robustness checks can be run with:
 
 ```bash
@@ -405,6 +421,19 @@ The manifest records relative paths, artifact categories, file sizes, MD5
 hashes, modification times, and whether each artifact is recommended for public
 archiving. Large derived dataset caches are excluded by default and can be
 included only when redistribution is permitted.
+
+To regenerate the submission-facing summary bundle from cached outputs without
+making new LLM calls, run:
+
+```bash
+Rscript benchmarks/reproduce_submission_bundle.R
+```
+
+This command rebuilds the external meta-analysis, robustness summaries, paired
+selector inference, universal reliability transfer tables, release manifest,
+and a machine-readable reproducibility report. Set
+`DEEPSEEKCELL_REPRODUCE_RUN_TESTS=true` to include `devtools::test()` in the
+same run.
 
 ### Fresh-clone benchmark workflow
 

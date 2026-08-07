@@ -101,11 +101,16 @@ larger 10-20 study confirmatory panel is prepared, frozen, and fully evaluated.
 
 ## Primary Endpoint
 
-The primary endpoint is correction efficiency under a matched refinement budget:
+The conservative primary endpoint is net correction efficiency under a matched
+refinement budget:
 
 ```text
-CorrectionEfficiency = (WrongToCorrect - CorrectToWrong) / NRefined
+NetCorrectionRate = (WrongToCorrect - CorrectToWrong) / NRefined
 ```
+
+Gross correction efficiency, `WrongToCorrect / NRefined`, should be reported as
+a secondary efficiency measure. Net efficiency is preferred for primary
+inference because it penalizes correct-to-wrong revisions.
 
 The primary comparison for the learned method is Risk-k versus compute-matched
 Evidence-k, Random-k, and Confidence-k within each model-dataset-replicate
@@ -179,6 +184,17 @@ Rscript benchmarks/analyse_external_validation_meta_analysis.R \
   results/external_validation_refinement_behavior.csv \
   results/external_validation_confidence_quality.csv \
   results/external_validation_meta_analysis
+```
+
+For paired selector contrasts using the dataset-replicate block as the unit,
+generate bootstrap confidence intervals, sign-flip permutation tests, Wilcoxon
+tests, effect sizes, false-discovery-rate adjusted p-values, and a contrast
+forest plot with:
+
+```bash
+Rscript benchmarks/analyse_selector_inference.R \
+  results/external_validation_refinement_behavior.csv \
+  results/external_validation_selector_inference
 ```
 
 ## Sensitivity Analyses
