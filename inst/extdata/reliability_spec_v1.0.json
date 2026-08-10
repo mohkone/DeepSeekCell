@@ -145,7 +145,7 @@
   "software": {
     "package": "DeepSeekCell",
     "version": "0.1.0",
-    "commit_recorded_at_freeze": "27c97215b022",
+    "commit_recorded_at_freeze": "ef745f22925e",
     "release_tag": "v0.1.0"
   },
   "ontology": {
@@ -168,6 +168,18 @@
       "max_tokens": 2000,
       "api_url_env": "OLLAMA_API_URL",
       "model_id_env": "OLLAMA_MODEL_ID"
+    },
+    "openai": {
+      "model_id": "gpt-5",
+      "temperature": null,
+      "max_tokens": 6000,
+      "max_tokens_env": "OPENAI_MAX_OUTPUT_TOKENS",
+      "reasoning_effort": "minimal",
+      "reasoning_effort_env": "OPENAI_REASONING_EFFORT",
+      "text_verbosity": "low",
+      "text_verbosity_env": "OPENAI_TEXT_VERBOSITY",
+      "api_url_env": "OPENAI_API_URL",
+      "model_id_env": "OPENAI_MODEL_ID"
     }
   },
   "development_benchmark": {

@@ -89,12 +89,16 @@ Sys.setenv(OPENAI_API_KEY = "...")
 Supported endpoint overrides:
 
 - `DEEPSEEK_API_URL`, `DEEPSEEK_MODEL_ID`
-- `OPENAI_API_URL`, `OPENAI_MODEL_ID`
+- `OPENAI_API_URL`, `OPENAI_MODEL_ID`, `OPENAI_MAX_OUTPUT_TOKENS`
+- `OPENAI_REASONING_EFFORT`, `OPENAI_TEXT_VERBOSITY`
 - `OLLAMA_API_URL`, `OLLAMA_MODEL_ID`
 
 OpenAI defaults to the Responses API endpoint and a configurable model ID
-(`OPENAI_MODEL_ID`, default `gpt-5`). Ollama can be used without an API key
-when a local server is running.
+(`OPENAI_MODEL_ID`, default `gpt-5`). GPT-5-compatible Responses calls default
+to `OPENAI_REASONING_EFFORT=minimal`, `OPENAI_TEXT_VERBOSITY=low`, and
+`OPENAI_MAX_OUTPUT_TOKENS=6000` so that annotation prompts return visible JSON
+instead of exhausting the output budget on hidden reasoning. Ollama can be used
+without an API key when a local server is running.
 
 ## R Usage
 
@@ -128,6 +132,8 @@ generate_html_report(result, "annotation_report.html")
 To run the same annotation call through an OpenAI-compatible frontier model,
 set `OPENAI_API_KEY` and use `model_name = "openai"`. Override
 `OPENAI_MODEL_ID` before the run when a different model identifier is required.
+For GPT-5, keep `OPENAI_REASONING_EFFORT=minimal` unless you also increase
+`OPENAI_MAX_OUTPUT_TOKENS`.
 
 Use `select_refinement_candidates()` directly when you want to audit or compare
 selectors without making a second LLM call:
@@ -273,6 +279,9 @@ manifest records the exact model ID and cached response hashes:
 ```bash
 set OPENAI_API_KEY=...
 set OPENAI_MODEL_ID=gpt-5
+set OPENAI_REASONING_EFFORT=minimal
+set OPENAI_TEXT_VERBOSITY=low
+set OPENAI_MAX_OUTPUT_TOKENS=6000
 set DEEPSEEKCELL_EXTRA_LLM_METHODS=OpenAI
 set DEEPSEEKCELL_USE_LLM_CACHE=true
 Rscript benchmarks/run_benchmark.R

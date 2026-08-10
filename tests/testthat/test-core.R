@@ -34,6 +34,8 @@ test_that("OpenAI Responses backend is configurable without network calls", {
   expect_equal(model$name, "OpenAI")
   expect_equal(model$api_format, "responses")
   expect_equal(model$api_key_env, "OPENAI_API_KEY")
+  expect_equal(model$reasoning_effort, "minimal")
+  expect_equal(model$text_verbosity, "low")
 
   response <- list(
     output_text = "{\"annotations\":[]}",
@@ -45,6 +47,30 @@ test_that("OpenAI Responses backend is configurable without network calls", {
   expect_equal(usage$prompt_tokens, 12)
   expect_equal(usage$completion_tokens, 8)
   expect_equal(usage$total_tokens, 20)
+
+  nested_response <- list(
+    status = "completed",
+    output = list(
+      list(type = "reasoning"),
+      list(
+        type = "message",
+        content = list(
+          list(type = "output_text", text = "{\"annotations\":[]}")
+        )
+      )
+    )
+  )
+
+  expect_equal(.extract_llm_response_text(nested_response, "responses"), "{\"annotations\":[]}")
+  expect_true(.validate_llm_response_content("{\"annotations\":[]}", nested_response, "responses"))
+  expect_error(
+    .validate_llm_response_content(
+      "",
+      list(status = "incomplete", incomplete_details = list(reason = "max_output_tokens")),
+      "responses"
+    ),
+    "incomplete response"
+  )
 })
 
 test_that("marker input processing removes common low-value genes", {

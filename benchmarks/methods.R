@@ -52,6 +52,7 @@ call_llm_api <- function(prompt, model_key, api_key, max_retries = 3) {
       data <- httr2::resp_body_json(resp, simplifyVector = FALSE)
 
       content <- benchmark_llm_response_text(data, api_format)
+      benchmark_validate_llm_response_text(content, data, api_format)
       usage <- benchmark_standardise_usage(data$usage %||% NULL, api_format)
 
       elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
@@ -98,6 +99,13 @@ benchmark_llm_request_body <- function(prompt, model, api_format = "chat") {
       input = prompt,
       max_output_tokens = model$max_tokens %||% 2000
     )
+
+    if (!is.null(model$reasoning_effort) && nzchar(model$reasoning_effort)) {
+      body$reasoning <- list(effort = model$reasoning_effort)
+    }
+    if (!is.null(model$text_verbosity) && nzchar(model$text_verbosity)) {
+      body$text <- list(verbosity = model$text_verbosity)
+    }
   } else {
     body <- list(
       model = model$model_id,
@@ -130,6 +138,33 @@ benchmark_llm_response_text <- function(data, api_format = "chat") {
   }
 
   data$choices[[1]]$message$content %||% ""
+}
+
+benchmark_response_is_blank <- function(x) {
+  is.null(x) ||
+    length(x) == 0 ||
+    all(!nzchar(trimws(as.character(x))))
+}
+
+benchmark_validate_llm_response_text <- function(content, data, api_format = "chat") {
+  status <- data$status %||% ""
+  reason <- data$incomplete_details$reason %||% ""
+
+  if (identical(api_format, "responses") &&
+      identical(status, "incomplete") &&
+      benchmark_response_is_blank(content)) {
+    stop(
+      "OpenAI Responses API returned an incomplete response without text",
+      if (nzchar(reason)) paste0(" (reason: ", reason, ")") else "",
+      call. = FALSE
+    )
+  }
+
+  if (benchmark_response_is_blank(content)) {
+    stop("LLM API returned empty response text.", call. = FALSE)
+  }
+
+  invisible(TRUE)
 }
 
 benchmark_standardise_usage <- function(usage, api_format = "chat") {

@@ -73,6 +73,11 @@ spec$model_defaults <- list(
     model_id = MODELS$openai$model_id,
     temperature = MODELS$openai$temperature,
     max_tokens = MODELS$openai$max_tokens,
+    max_tokens_env = MODELS$openai$max_tokens_env,
+    reasoning_effort = MODELS$openai$reasoning_effort,
+    reasoning_effort_env = MODELS$openai$reasoning_effort_env,
+    text_verbosity = MODELS$openai$text_verbosity,
+    text_verbosity_env = MODELS$openai$text_verbosity_env,
     api_url_env = MODELS$openai$api_url_env,
     model_id_env = MODELS$openai$model_id_env
   )

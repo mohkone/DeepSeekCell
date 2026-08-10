@@ -39,8 +39,13 @@ MODELS <- list(
     api_url_env = "OPENAI_API_URL",
     model_id = "gpt-5",
     model_id_env = "OPENAI_MODEL_ID",
-    max_tokens = 2000,
+    max_tokens = 6000,
+    max_tokens_env = "OPENAI_MAX_OUTPUT_TOKENS",
     temperature = NULL,
+    reasoning_effort = "minimal",
+    reasoning_effort_env = "OPENAI_REASONING_EFFORT",
+    text_verbosity = "low",
+    text_verbosity_env = "OPENAI_TEXT_VERBOSITY",
     cost_per_1k_tokens = 0,
     requires_api_key = TRUE,
     api_key_env = "OPENAI_API_KEY",
@@ -69,6 +74,9 @@ get_model_config <- function(model_name) {
   model <- MODELS[[model_name]]
   api_url_override <- first_env(model$api_url_env %||% character())
   model_id_override <- first_env(model$model_id_env %||% character())
+  max_tokens_override <- first_env(model$max_tokens_env %||% character())
+  reasoning_effort_override <- first_env(model$reasoning_effort_env %||% character())
+  text_verbosity_override <- first_env(model$text_verbosity_env %||% character())
 
   if (nzchar(api_url_override)) {
     if (grepl("/$", api_url_override) && !grepl("/chat/completions/?$", api_url_override)) {
@@ -79,6 +87,18 @@ get_model_config <- function(model_name) {
 
   if (nzchar(model_id_override)) {
     model$model_id <- model_id_override
+  }
+  if (nzchar(max_tokens_override)) {
+    parsed_max_tokens <- suppressWarnings(as.numeric(max_tokens_override))
+    if (!is.na(parsed_max_tokens) && parsed_max_tokens > 0) {
+      model$max_tokens <- parsed_max_tokens
+    }
+  }
+  if (nzchar(reasoning_effort_override)) {
+    model$reasoning_effort <- reasoning_effort_override
+  }
+  if (nzchar(text_verbosity_override)) {
+    model$text_verbosity <- text_verbosity_override
   }
 
   model
@@ -152,6 +172,7 @@ call_llm_api <- function(prompt,
       data <- httr2::resp_body_json(resp, simplifyVector = FALSE)
       
       content <- .extract_llm_response_text(data, api_format)
+      .validate_llm_response_content(content, data, api_format)
       usage <- .standardise_llm_usage(data$usage %||% NULL, api_format)
       
       elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
@@ -200,6 +221,13 @@ call_llm_api <- function(prompt,
       input = prompt,
       max_output_tokens = model$max_tokens
     )
+
+    if (!is.null(model$reasoning_effort) && nzchar(model$reasoning_effort)) {
+      body$reasoning <- list(effort = model$reasoning_effort)
+    }
+    if (!is.null(model$text_verbosity) && nzchar(model$text_verbosity)) {
+      body$text <- list(verbosity = model$text_verbosity)
+    }
   } else {
     body <- list(
       model = model$model_id,
@@ -234,6 +262,33 @@ call_llm_api <- function(prompt,
   }
 
   data$choices[[1]]$message$content %||% ""
+}
+
+.llm_response_is_blank <- function(x) {
+  is.null(x) ||
+    length(x) == 0 ||
+    all(!nzchar(trimws(as.character(x))))
+}
+
+.validate_llm_response_content <- function(content, data, api_format = "chat") {
+  status <- data$status %||% ""
+  reason <- data$incomplete_details$reason %||% ""
+
+  if (identical(api_format, "responses") &&
+      identical(status, "incomplete") &&
+      .llm_response_is_blank(content)) {
+    stop(
+      "OpenAI Responses API returned an incomplete response without text",
+      if (nzchar(reason)) paste0(" (reason: ", reason, ")") else "",
+      call. = FALSE
+    )
+  }
+
+  if (.llm_response_is_blank(content)) {
+    stop("LLM API returned empty response text.", call. = FALSE)
+  }
+
+  invisible(TRUE)
 }
 
 .standardise_llm_usage <- function(usage, api_format = "chat") {

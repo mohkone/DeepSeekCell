@@ -41,8 +41,13 @@ MODELS <- list(
     api_url_env = "OPENAI_API_URL",
     model_id = "gpt-5",
     model_id_env = "OPENAI_MODEL_ID",
-    max_tokens = 2000,
+    max_tokens = 6000,
+    max_tokens_env = "OPENAI_MAX_OUTPUT_TOKENS",
     temperature = NULL,
+    reasoning_effort = "minimal",
+    reasoning_effort_env = "OPENAI_REASONING_EFFORT",
+    text_verbosity = "low",
+    text_verbosity_env = "OPENAI_TEXT_VERBOSITY",
     input_cost_per_1k = 0,
     output_cost_per_1k = 0,
     requires_api_key = TRUE,
@@ -55,12 +60,27 @@ MODELS <- list(
 for (model_name in names(MODELS)) {
   api_url_override <- Sys.getenv(MODELS[[model_name]]$api_url_env %||% "", unset = "")
   model_id_override <- Sys.getenv(MODELS[[model_name]]$model_id_env %||% "", unset = "")
+  max_tokens_override <- Sys.getenv(MODELS[[model_name]]$max_tokens_env %||% "", unset = "")
+  reasoning_effort_override <- Sys.getenv(MODELS[[model_name]]$reasoning_effort_env %||% "", unset = "")
+  text_verbosity_override <- Sys.getenv(MODELS[[model_name]]$text_verbosity_env %||% "", unset = "")
 
   if (nzchar(api_url_override)) {
     MODELS[[model_name]]$api_url <- api_url_override
   }
   if (nzchar(model_id_override)) {
     MODELS[[model_name]]$model_id <- model_id_override
+  }
+  if (nzchar(max_tokens_override)) {
+    parsed_max_tokens <- suppressWarnings(as.numeric(max_tokens_override))
+    if (!is.na(parsed_max_tokens) && parsed_max_tokens > 0) {
+      MODELS[[model_name]]$max_tokens <- parsed_max_tokens
+    }
+  }
+  if (nzchar(reasoning_effort_override)) {
+    MODELS[[model_name]]$reasoning_effort <- reasoning_effort_override
+  }
+  if (nzchar(text_verbosity_override)) {
+    MODELS[[model_name]]$text_verbosity <- text_verbosity_override
   }
 }
 
