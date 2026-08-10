@@ -57,18 +57,19 @@ call_llm_api <- function(prompt, model_key, api_key, max_retries = 3) {
 
       elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
 
-      cost <- NA_real_
-      if (!is.na(usage$prompt_tokens) && !is.na(usage$completion_tokens)) {
-        cost <- (usage$prompt_tokens / 1000) * (model$input_cost_per_1k %||% 0) +
-          (usage$completion_tokens / 1000) * (model$output_cost_per_1k %||% 0)
-      }
+      cost <- benchmark_estimate_cost_usd(usage, model)
+      pricing <- benchmark_pricing_metadata(model)
 
       list(
         success = TRUE,
         content = content,
         usage = usage,
         runtime_sec = elapsed,
-        cost_usd = cost
+        cost_usd = cost,
+        pricing_date = pricing$PricingDate,
+        pricing_source = pricing$PricingSource,
+        input_cost_per_1m_tokens = pricing$InputCostPer1MTokens,
+        output_cost_per_1m_tokens = pricing$OutputCostPer1MTokens
       )
     }, error = function(e) {
       last_error <<- conditionMessage(e)
@@ -85,7 +86,11 @@ call_llm_api <- function(prompt, model_key, api_key, max_retries = 3) {
     error = last_error %||% "Unknown API error",
     usage = list(prompt_tokens = 0, completion_tokens = 0, total_tokens = 0),
     runtime_sec = as.numeric(difftime(Sys.time(), start, units = "secs")),
-    cost_usd = NA_real_
+    cost_usd = NA_real_,
+    pricing_date = model$pricing_date %||% NA_character_,
+    pricing_source = model$pricing_source %||% NA_character_,
+    input_cost_per_1m_tokens = 1000 * suppressWarnings(as.numeric(model$input_cost_per_1k %||% NA_real_)),
+    output_cost_per_1m_tokens = 1000 * suppressWarnings(as.numeric(model$output_cost_per_1k %||% NA_real_))
   )
 }
 
@@ -193,6 +198,41 @@ benchmark_standardise_usage <- function(usage, api_format = "chat") {
     prompt_tokens = prompt_tokens,
     completion_tokens = completion_tokens,
     total_tokens = total_tokens
+  )
+}
+
+benchmark_safe_number <- function(x, default = 0) {
+  out <- suppressWarnings(as.numeric(x %||% default))
+  if (length(out) == 0 || is.na(out)) {
+    return(default)
+  }
+  out
+}
+
+benchmark_estimate_cost_usd <- function(usage, model) {
+  prompt_tokens <- benchmark_safe_number(usage$prompt_tokens %||% 0)
+  completion_tokens <- benchmark_safe_number(usage$completion_tokens %||% 0)
+  input_cost <- suppressWarnings(as.numeric(model$input_cost_per_1k %||% NA_real_))
+  output_cost <- suppressWarnings(as.numeric(model$output_cost_per_1k %||% NA_real_))
+
+  if (!is.na(input_cost) || !is.na(output_cost)) {
+    input_cost[is.na(input_cost)] <- 0
+    output_cost[is.na(output_cost)] <- 0
+    return((prompt_tokens / 1000) * input_cost + (completion_tokens / 1000) * output_cost)
+  }
+
+  NA_real_
+}
+
+benchmark_pricing_metadata <- function(model) {
+  input_cost <- suppressWarnings(as.numeric(model$input_cost_per_1k %||% NA_real_))
+  output_cost <- suppressWarnings(as.numeric(model$output_cost_per_1k %||% NA_real_))
+
+  list(
+    PricingDate = model$pricing_date %||% NA_character_,
+    PricingSource = model$pricing_source %||% NA_character_,
+    InputCostPer1MTokens = ifelse(is.na(input_cost), NA_real_, input_cost * 1000),
+    OutputCostPer1MTokens = ifelse(is.na(output_cost), NA_real_, output_cost * 1000)
   )
 }
 
@@ -472,7 +512,13 @@ run_llm_annotation <- function(markers_list,
       predictions = pred,
       runtime_sec = api_res$runtime_sec,
       cost_usd = api_res$cost_usd,
-      tokens = 0
+      tokens = 0,
+      prompt_tokens = 0,
+      completion_tokens = 0,
+      pricing_date = api_res$pricing_date %||% NA_character_,
+      pricing_source = api_res$pricing_source %||% NA_character_,
+      input_cost_per_1m_tokens = api_res$input_cost_per_1m_tokens %||% NA_real_,
+      output_cost_per_1m_tokens = api_res$output_cost_per_1m_tokens %||% NA_real_
     ))
   }
 
@@ -510,6 +556,10 @@ run_llm_annotation <- function(markers_list,
     tokens = api_res$usage$total_tokens %||% NA_real_,
     prompt_tokens = api_res$usage$prompt_tokens %||% NA_real_,
     completion_tokens = api_res$usage$completion_tokens %||% NA_real_,
+    pricing_date = api_res$pricing_date %||% NA_character_,
+    pricing_source = api_res$pricing_source %||% NA_character_,
+    input_cost_per_1m_tokens = api_res$input_cost_per_1m_tokens %||% NA_real_,
+    output_cost_per_1m_tokens = api_res$output_cost_per_1m_tokens %||% NA_real_,
     response_text = api_res$content %||% "",
     prompt_text = prompt
   )

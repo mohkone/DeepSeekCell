@@ -99,6 +99,9 @@ to `OPENAI_REASONING_EFFORT=minimal`, `OPENAI_TEXT_VERBOSITY=low`, and
 `OPENAI_MAX_OUTPUT_TOKENS=6000` so that annotation prompts return visible JSON
 instead of exhausting the output budget on hidden reasoning. Ollama can be used
 without an API key when a local server is running.
+OpenAI cost estimates use directional prompt and completion token accounting
+with the pricing date and source recorded in benchmark outputs; token counts
+and second-pass calls remain the preferred stable compute measures.
 
 ## R Usage
 
@@ -292,6 +295,8 @@ stability, runtime, cost, token, and statistical summaries including
 `benchmark_pairwise_wilcoxon.csv`, `benchmark_friedman_tests.csv`,
 `ablation_confidence_quality.csv`, `ablation_refinement_behavior.csv`,
 `refinement_efficiency_summary.csv`, and `benchmark_llm_stability.csv`.
+For OpenAI runs, the output tables include `PricingDate`, `PricingSource`,
+input/output token counts, directional price fields, and `EstimatedCostUSD`.
 
 ### Locked external validation
 

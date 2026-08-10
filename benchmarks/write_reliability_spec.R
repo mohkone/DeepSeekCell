@@ -78,6 +78,10 @@ spec$model_defaults <- list(
     reasoning_effort_env = MODELS$openai$reasoning_effort_env,
     text_verbosity = MODELS$openai$text_verbosity,
     text_verbosity_env = MODELS$openai$text_verbosity_env,
+    input_cost_per_1m_tokens = 1000 * MODELS$openai$input_cost_per_1k,
+    output_cost_per_1m_tokens = 1000 * MODELS$openai$output_cost_per_1k,
+    pricing_date = MODELS$openai$pricing_date,
+    pricing_source = MODELS$openai$pricing_source,
     api_url_env = MODELS$openai$api_url_env,
     model_id_env = MODELS$openai$model_id_env
   )

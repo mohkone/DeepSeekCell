@@ -46,7 +46,11 @@ MODELS <- list(
     reasoning_effort_env = "OPENAI_REASONING_EFFORT",
     text_verbosity = "low",
     text_verbosity_env = "OPENAI_TEXT_VERBOSITY",
+    input_cost_per_1k = 0.00125,
+    output_cost_per_1k = 0.01000,
     cost_per_1k_tokens = 0,
+    pricing_date = "2026-08-11",
+    pricing_source = "https://developers.openai.com/api/docs/models/gpt-5-chat-latest",
     requires_api_key = TRUE,
     api_key_env = "OPENAI_API_KEY",
     is_ollama = FALSE,
@@ -177,6 +181,7 @@ call_llm_api <- function(prompt,
       
       elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
       tokens <- .api_safe_token_count(usage$total_tokens %||% 0)
+      cost_usd <- .estimate_llm_cost_usd(usage, model)
       
       list(
         success = TRUE,
@@ -185,7 +190,11 @@ call_llm_api <- function(prompt,
         model = model$name,
         latency_sec = elapsed,
         runtime_sec = elapsed,
-        cost_usd = (tokens / 1000) * (model$cost_per_1k_tokens %||% 0),
+        cost_usd = cost_usd,
+        pricing_date = model$pricing_date %||% NA_character_,
+        pricing_source = model$pricing_source %||% NA_character_,
+        input_cost_per_1k = model$input_cost_per_1k %||% NA_real_,
+        output_cost_per_1k = model$output_cost_per_1k %||% NA_real_,
         attempt = attempt
       )
     }, error = function(e) {
@@ -325,6 +334,22 @@ call_llm_api <- function(prompt,
   out <- suppressWarnings(as.numeric(x %||% 0))
   out[is.na(out)] <- 0
   sum(out)
+}
+
+.estimate_llm_cost_usd <- function(usage, model) {
+  prompt_tokens <- .api_safe_token_count(usage$prompt_tokens %||% 0)
+  completion_tokens <- .api_safe_token_count(usage$completion_tokens %||% 0)
+  input_cost <- suppressWarnings(as.numeric(model$input_cost_per_1k %||% NA_real_))
+  output_cost <- suppressWarnings(as.numeric(model$output_cost_per_1k %||% NA_real_))
+
+  if (!is.na(input_cost) || !is.na(output_cost)) {
+    input_cost[is.na(input_cost)] <- 0
+    output_cost[is.na(output_cost)] <- 0
+    return((prompt_tokens / 1000) * input_cost + (completion_tokens / 1000) * output_cost)
+  }
+
+  total_tokens <- .api_safe_token_count(usage$total_tokens %||% 0)
+  (total_tokens / 1000) * suppressWarnings(as.numeric(model$cost_per_1k_tokens %||% 0))
 }
 
 #' Call local Ollama API

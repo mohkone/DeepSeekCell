@@ -506,6 +506,8 @@ evaluate_ablation_arm <- function(annotations,
                                   refinement_runtime_sec = 0,
                                   refinement_cost_usd = 0,
                                   refinement_tokens = 0,
+                                  refinement_prompt_tokens = 0,
+                                  refinement_completion_tokens = 0,
                                   second_pass_calls = 0) {
   markers <- data$markers
   truth <- data$truth
@@ -607,13 +609,32 @@ evaluate_ablation_arm <- function(annotations,
   runtime <- method_res$runtime_sec
   cost <- method_res$cost_usd
   tokens <- method_res$tokens
+  first_pass_prompt_tokens <- safe_usage_number(method_res$prompt_tokens)
+  first_pass_completion_tokens <- safe_usage_number(method_res$completion_tokens)
+  refinement_prompt_tokens <- safe_usage_number(refinement_prompt_tokens)
+  refinement_completion_tokens <- safe_usage_number(refinement_completion_tokens)
+  total_input_tokens <- first_pass_prompt_tokens
+  total_output_tokens <- first_pass_completion_tokens
   if (isTRUE(second_pass_calls > 0)) {
     runtime <- runtime + refinement_runtime_sec
     cost <- cost + refinement_cost_usd
     tokens <- tokens + refinement_tokens
+    total_input_tokens <- total_input_tokens + refinement_prompt_tokens
+    total_output_tokens <- total_output_tokens + refinement_completion_tokens
   }
+  model_for_pricing <- if (
+    length(llm_backend) == 1 &&
+      !is.na(llm_backend) &&
+      llm_backend %in% names(MODELS)
+  ) {
+    MODELS[[llm_backend]]
+  } else {
+    list()
+  }
+  pricing <- benchmark_pricing_metadata(model_for_pricing)
 
   result_row <- data.frame(
+    Replicate = replicate,
     Dataset = dataset_name,
     Tissue = tissue,
     Species = species,
@@ -626,11 +647,23 @@ evaluate_ablation_arm <- function(annotations,
     NClusters = length(markers),
     RuntimeSec = runtime,
     CostUSD = cost,
+    EstimatedCostUSD = cost,
     Tokens = tokens,
+    TotalTokens = tokens,
+    TotalInputTokens = total_input_tokens,
+    TotalOutputTokens = total_output_tokens,
+    PricingDate = method_res$pricing_date %||% pricing$PricingDate,
+    PricingSource = method_res$pricing_source %||% pricing$PricingSource,
+    InputCostPer1MTokens = method_res$input_cost_per_1m_tokens %||% pricing$InputCostPer1MTokens,
+    OutputCostPer1MTokens = method_res$output_cost_per_1m_tokens %||% pricing$OutputCostPer1MTokens,
     FirstPassRuntimeSec = method_res$runtime_sec,
     RefinementRuntimeSec = refinement_runtime_sec,
     FirstPassTokens = method_res$tokens,
+    FirstPassPromptTokens = first_pass_prompt_tokens,
+    FirstPassCompletionTokens = first_pass_completion_tokens,
     RefinementTokens = refinement_tokens,
+    RefinementPromptTokens = refinement_prompt_tokens,
+    RefinementCompletionTokens = refinement_completion_tokens,
     SecondPassCalls = second_pass_calls,
     FirstPassResponseHash = first_pass_hash,
     MeanClusterPurity = mean(cluster_purity, na.rm = TRUE),
@@ -890,6 +923,10 @@ run_refinement_control <- function(selector,
     tokens = 0,
     prompt_tokens = 0,
     completion_tokens = 0,
+    pricing_date = MODELS[[model_key]]$pricing_date %||% NA_character_,
+    pricing_source = MODELS[[model_key]]$pricing_source %||% NA_character_,
+    input_cost_per_1m_tokens = 1000 * suppressWarnings(as.numeric(MODELS[[model_key]]$input_cost_per_1k %||% NA_real_)),
+    output_cost_per_1m_tokens = 1000 * suppressWarnings(as.numeric(MODELS[[model_key]]$output_cost_per_1k %||% NA_real_)),
     second_pass_calls = 0,
     response_hash = NA_character_,
     prompt_hash = NA_character_
@@ -927,6 +964,10 @@ run_refinement_control <- function(selector,
     out$tokens <- safe_usage_number(cached$metadata$tokens)
     out$prompt_tokens <- safe_usage_number(cached$metadata$prompt_tokens)
     out$completion_tokens <- safe_usage_number(cached$metadata$completion_tokens)
+    out$pricing_date <- cached$metadata$pricing_date %||% out$pricing_date
+    out$pricing_source <- cached$metadata$pricing_source %||% out$pricing_source
+    out$input_cost_per_1m_tokens <- cached$metadata$input_cost_per_1m_tokens %||% out$input_cost_per_1m_tokens
+    out$output_cost_per_1m_tokens <- cached$metadata$output_cost_per_1m_tokens %||% out$output_cost_per_1m_tokens
     out$second_pass_calls <- 1
     out$response_hash <- cached$response_hash %||% hash_text_md5(content)
     out$prompt_hash <- refinement_prompt_hash
@@ -940,6 +981,10 @@ run_refinement_control <- function(selector,
     out$tokens <- safe_usage_number(refinement_res$usage$total_tokens)
     out$prompt_tokens <- safe_usage_number(refinement_res$usage$prompt_tokens)
     out$completion_tokens <- safe_usage_number(refinement_res$usage$completion_tokens)
+    out$pricing_date <- refinement_res$pricing_date %||% out$pricing_date
+    out$pricing_source <- refinement_res$pricing_source %||% out$pricing_source
+    out$input_cost_per_1m_tokens <- refinement_res$input_cost_per_1m_tokens %||% out$input_cost_per_1m_tokens
+    out$output_cost_per_1m_tokens <- refinement_res$output_cost_per_1m_tokens %||% out$output_cost_per_1m_tokens
     out$second_pass_calls <- 1
     out$response_hash <- hash_text_md5(content)
     out$prompt_hash <- refinement_prompt_hash
@@ -960,7 +1005,11 @@ run_refinement_control <- function(selector,
         tokens = out$tokens,
         prompt_tokens = out$prompt_tokens,
         completion_tokens = out$completion_tokens,
-        cost_usd = out$cost_usd
+        cost_usd = out$cost_usd,
+        pricing_date = out$pricing_date,
+        pricing_source = out$pricing_source,
+        input_cost_per_1m_tokens = out$input_cost_per_1m_tokens,
+        output_cost_per_1m_tokens = out$output_cost_per_1m_tokens
       )
     )
   }
@@ -1016,7 +1065,15 @@ run_llm_ablation_wrapper <- function(dataset_name,
       cost_usd = safe_usage_number(cached_first_pass$metadata$cost_usd),
       tokens = safe_usage_number(cached_first_pass$metadata$tokens),
       prompt_tokens = safe_usage_number(cached_first_pass$metadata$prompt_tokens),
-      completion_tokens = safe_usage_number(cached_first_pass$metadata$completion_tokens)
+      completion_tokens = safe_usage_number(cached_first_pass$metadata$completion_tokens),
+      pricing_date = cached_first_pass$metadata$pricing_date %||%
+        MODELS[[model_key]]$pricing_date %||% NA_character_,
+      pricing_source = cached_first_pass$metadata$pricing_source %||%
+        MODELS[[model_key]]$pricing_source %||% NA_character_,
+      input_cost_per_1m_tokens = cached_first_pass$metadata$input_cost_per_1m_tokens %||%
+        (1000 * suppressWarnings(as.numeric(MODELS[[model_key]]$input_cost_per_1k %||% NA_real_))),
+      output_cost_per_1m_tokens = cached_first_pass$metadata$output_cost_per_1m_tokens %||%
+        (1000 * suppressWarnings(as.numeric(MODELS[[model_key]]$output_cost_per_1k %||% NA_real_)))
     )
     first_pass_hash <- cached_first_pass$response_hash %||%
       hash_text_md5(method_res$response_text %||% "")
@@ -1046,7 +1103,11 @@ run_llm_ablation_wrapper <- function(dataset_name,
         tokens = method_res$tokens,
         prompt_tokens = method_res$prompt_tokens %||% NA_real_,
         completion_tokens = method_res$completion_tokens %||% NA_real_,
-        cost_usd = method_res$cost_usd
+        cost_usd = method_res$cost_usd,
+        pricing_date = method_res$pricing_date %||% NA_character_,
+        pricing_source = method_res$pricing_source %||% NA_character_,
+        input_cost_per_1m_tokens = method_res$input_cost_per_1m_tokens %||% NA_real_,
+        output_cost_per_1m_tokens = method_res$output_cost_per_1m_tokens %||% NA_real_
       )
     )
   }
@@ -1245,6 +1306,8 @@ run_llm_ablation_wrapper <- function(dataset_name,
         runtime_sec = 0,
         cost_usd = 0,
         tokens = 0,
+        prompt_tokens = 0,
+        completion_tokens = 0,
         second_pass_calls = 0
       )
     }
@@ -1265,6 +1328,8 @@ run_llm_ablation_wrapper <- function(dataset_name,
       refinement_runtime_sec = refinement_run$runtime_sec,
       refinement_cost_usd = refinement_run$cost_usd,
       refinement_tokens = refinement_run$tokens,
+      refinement_prompt_tokens = refinement_run$prompt_tokens,
+      refinement_completion_tokens = refinement_run$completion_tokens,
       second_pass_calls = refinement_run$second_pass_calls
     )
   })
@@ -1303,6 +1368,10 @@ run_llm_ablation_wrapper <- function(dataset_name,
         RefinementTokens = refinement_run$tokens,
         RefinementRuntimeSec = refinement_run$runtime_sec,
         RefinementCostUSD = refinement_run$cost_usd,
+        RefinementPricingDate = refinement_run$pricing_date %||% NA_character_,
+        RefinementPricingSource = refinement_run$pricing_source %||% NA_character_,
+        RefinementInputCostPer1MTokens = refinement_run$input_cost_per_1m_tokens %||% NA_real_,
+        RefinementOutputCostPer1MTokens = refinement_run$output_cost_per_1m_tokens %||% NA_real_,
         SecondPassCalls = refinement_run$second_pass_calls,
         CostPerCorrectedError = safe_divide(
           refinement_run$cost_usd,
@@ -1588,21 +1657,29 @@ run_replicated_benchmark <- function(n_replicates = 1,
     if (length(x) < 2) NA_real_ else stats::qt(0.975, df = length(x) - 1) * stats::sd(x) / sqrt(length(x))
   }
 
+  summary_metric_cols <- intersect(
+    c(
+      "ARI", "MacroF1", "Accuracy", "BalancedAcc", "CladeAcc", "UnknownRate",
+      "RuntimeSec", "CostUSD", "EstimatedCostUSD", "Tokens", "TotalTokens",
+      "TotalInputTokens", "TotalOutputTokens", "FirstPassRuntimeSec",
+      "RefinementRuntimeSec", "FirstPassTokens", "FirstPassPromptTokens",
+      "FirstPassCompletionTokens", "RefinementTokens", "RefinementPromptTokens",
+      "RefinementCompletionTokens",
+      "SecondPassCalls", "RefinementBudgetK", "MeanClusterPurity", "MinClusterPurity",
+      "EvaluatedClusters", "NativeCellARI", "NativeCellMacroF1",
+      "NativeCellAccuracy", "NativeCellBalancedAcc", "NativeCellCladeAcc",
+      "NativeCellUnknownRate", "NativeCellEvaluatedCells"
+    ),
+    names(full)
+  )
+
   summary <- full %>%
     group_by(Dataset, Tissue, Species, Method) %>%
     summarise(
       NReplicates = dplyr::n(),
       SuccessfulRuns = sum(!is.na(MacroF1)),
       across(
-        c(
-          ARI, MacroF1, Accuracy, BalancedAcc, CladeAcc, UnknownRate,
-          RuntimeSec, CostUSD, Tokens, FirstPassRuntimeSec,
-          RefinementRuntimeSec, FirstPassTokens, RefinementTokens,
-          SecondPassCalls, RefinementBudgetK, MeanClusterPurity, MinClusterPurity,
-          EvaluatedClusters, NativeCellARI, NativeCellMacroF1,
-          NativeCellAccuracy, NativeCellBalancedAcc, NativeCellCladeAcc,
-          NativeCellUnknownRate, NativeCellEvaluatedCells
-        ),
+        all_of(summary_metric_cols),
         list(
           mean = mean_or_na,
           sd = sd_or_na,
