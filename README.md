@@ -132,8 +132,8 @@ result$annotations
 generate_html_report(result, "annotation_report.html")
 ```
 
-To run the same annotation call through an OpenAI-compatible frontier model,
-set `OPENAI_API_KEY` and use `model_name = "openai"`. Override
+To run the same annotation call through an OpenAI-compatible independent
+reasoning-model backend, set `OPENAI_API_KEY` and use `model_name = "openai"`. Override
 `OPENAI_MODEL_ID` before the run when a different model identifier is required.
 For GPT-5, keep `OPENAI_REASONING_EFFORT=minimal` unless you also increase
 `OPENAI_MAX_OUTPUT_TOKENS`.

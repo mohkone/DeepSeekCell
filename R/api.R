@@ -50,7 +50,7 @@ MODELS <- list(
     output_cost_per_1k = 0.01000,
     cost_per_1k_tokens = 0,
     pricing_date = "2026-08-11",
-    pricing_source = "https://developers.openai.com/api/docs/models/gpt-5-chat-latest",
+    pricing_source = "https://developers.openai.com/api/docs/models/gpt-5",
     requires_api_key = TRUE,
     api_key_env = "OPENAI_API_KEY",
     is_ollama = FALSE,
