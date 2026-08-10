@@ -2,7 +2,8 @@
 
 # Cross-model selector synthesis for frozen DeepSeekCell benchmark outputs.
 # This script performs no API calls. It only reads completed benchmark CSVs and
-# summarizes whether evidence-guided selection behaves consistently across LLM
+# summarizes whether evidence-guided selection shows consistent qualitative
+# behavior across evaluated LLM backends and complementary evaluation scopes.
 # backends and evaluation scopes.
 
 `%||%` <- function(x, y) {
@@ -184,6 +185,82 @@ wide_net_table <- function(summary) {
   out[order(out$Model, out$Scope), , drop = FALSE]
 }
 
+format_ratio <- function(numerator, denominator) {
+  ifelse(
+    is.na(numerator) | is.na(denominator),
+    "NA",
+    paste0(numerator, "/", denominator)
+  )
+}
+
+format_percent <- function(x) {
+  ifelse(is.na(x), "NA", sprintf("%.1f%%", 100 * x))
+}
+
+main_results_table <- function(wide) {
+  if (nrow(wide) == 0) {
+    return(data.frame())
+  }
+
+  scope <- ifelse(
+    grepl("development", wide$Source),
+    ifelse(wide$Replicates > 1, "Development, 3 replicates", "Development, 1 replicate"),
+    "Local multimodel pilot"
+  )
+
+  data.frame(
+    Backend = wide$Model,
+    Scope = scope,
+    EvidenceRefined = wide$EvidenceRefined,
+    WrongToCorrect = wide$EvidenceWrongToCorrect,
+    CorrectToWrong = wide$EvidenceCorrectToWrong,
+    NetEfficiency = format_percent(wide$EvidenceNetCorrectionEfficiency),
+    RandomNet = format_ratio(wide$RandomkNet, wide$RandomkRefined),
+    ConfidenceNet = format_ratio(wide$ConfidencekNet, wide$ConfidencekRefined),
+    FullRefinedNet = ifelse(is.na(wide$FullRefinedNet), "Not evaluated", as.character(wide$FullRefinedNet)),
+    stringsAsFactors = FALSE
+  )
+}
+
+write_latex_table <- function(x, path) {
+  if (nrow(x) == 0) {
+    return(invisible(FALSE))
+  }
+
+  escape <- function(value) {
+    value <- as.character(value)
+    value <- gsub("\\\\", "\\\\textbackslash{}", value)
+    value <- gsub("&", "\\\\&", value)
+    value <- gsub("%", "\\\\%", value)
+    value <- gsub("_", "\\\\_", value)
+    value
+  }
+
+  header <- c(
+    "\\begin{table*}[!t]",
+    "\\centering",
+    "\\caption{Cross-model synthesis of selective-refinement behaviour. Net efficiency is \\((N_{wrong\\to correct}-N_{correct\\to wrong})/N_{refined}\\). Scope is reported explicitly because DeepSeek/GPT-5 and local Ollama backends were evaluated under complementary benchmark designs. Random-k and Confidence-k entries show net corrections divided by the number refined under that selector; the DeepSeek and GPT-5 development rows are compute-matched to Evidence-k.}",
+    "\\label{tab:cross-model-selector}",
+    "\\begin{tabular}{llrrrrlll}",
+    "\\toprule",
+    "Backend & Scope & Evidence refined & W$\\to$C & C$\\to$W & Net efficiency & Random-k net & Confidence-k net & FullRefined net\\\\",
+    "\\midrule"
+  )
+  body <- apply(x, 1, function(row) {
+    paste0(
+      paste(escape(row), collapse = " & "),
+      "\\\\"
+    )
+  })
+  footer <- c(
+    "\\bottomrule",
+    "\\end{tabular}",
+    "\\end{table*}"
+  )
+  writeLines(c(header, body, footer), path)
+  invisible(TRUE)
+}
+
 contrast_table <- function(summary) {
   evidence <- summary[summary$Selector == "Evidence-k", , drop = FALSE]
   comparators <- summary[summary$Selector %in% c(
@@ -240,29 +317,54 @@ records <- list(
 records <- do.call(rbind, records)
 summary <- aggregate_selector_behavior(records)
 wide <- wide_net_table(summary)
+main_table <- main_results_table(wide)
 contrasts <- contrast_table(summary)
 
 dir.create(results_dir, showWarnings = FALSE, recursive = TRUE)
 utils::write.csv(summary, paste0(output_prefix, "_summary.csv"), row.names = FALSE)
 utils::write.csv(wide, paste0(output_prefix, "_net_table.csv"), row.names = FALSE)
+utils::write.csv(main_table, paste0(output_prefix, "_main_table.csv"), row.names = FALSE)
+write_latex_table(main_table, paste0(output_prefix, "_main_table.tex"))
 utils::write.csv(contrasts, paste0(output_prefix, "_contrasts.csv"), row.names = FALSE)
 
 if (requireNamespace("ggplot2", quietly = TRUE) && nrow(summary) > 0) {
-  plot_data <- summary[summary$Selector %in% c(
-    "Evidence-k", "Random-k", "Confidence-k", "NoOntology-k", "FullRefined"
-  ), , drop = FALSE]
-  plot_data$Selector <- factor(
-    plot_data$Selector,
-    levels = c("Evidence-k", "Random-k", "Confidence-k", "NoOntology-k", "FullRefined")
+  selector_levels <- c("Evidence-k", "Random-k", "Confidence-k", "NoOntology-k", "FullRefined")
+  base_grid <- expand.grid(
+    Model = unique(summary$Model),
+    Selector = selector_levels,
+    stringsAsFactors = FALSE
   )
+  plot_data <- merge(
+    base_grid,
+    summary[summary$Selector %in% selector_levels, , drop = FALSE],
+    by = c("Model", "Selector"),
+    all.x = TRUE,
+    sort = FALSE
+  )
+  plot_data$Selector <- factor(plot_data$Selector, levels = selector_levels)
+  plot_data$Evaluated <- !is.na(plot_data$NetCorrectionEfficiency)
+
   p <- ggplot2::ggplot(
-    plot_data,
+    plot_data[plot_data$Evaluated, , drop = FALSE],
     ggplot2::aes(x = Selector, y = NetCorrectionEfficiency, fill = Selector)
   ) +
     ggplot2::geom_hline(yintercept = 0, linewidth = 0.3, colour = "grey45") +
     ggplot2::geom_col(width = 0.72, colour = "grey20", linewidth = 0.2) +
-    ggplot2::facet_wrap(~ Model, nrow = 1, scales = "free_y") +
-    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    ggplot2::geom_text(
+      data = plot_data[!plot_data$Evaluated, , drop = FALSE],
+      ggplot2::aes(x = Selector, y = -0.92, label = "Not evaluated"),
+      inherit.aes = FALSE,
+      angle = 90,
+      size = 2.6,
+      colour = "grey35"
+    ) +
+    ggplot2::facet_wrap(~ Model, nrow = 1) +
+    ggplot2::scale_x_discrete(drop = FALSE) +
+    ggplot2::scale_y_continuous(
+      limits = c(-1, 1),
+      breaks = seq(-1, 1, by = 0.5),
+      labels = scales::percent_format(accuracy = 1)
+    ) +
     ggplot2::labs(
       x = NULL,
       y = "Net correction efficiency",
@@ -285,5 +387,7 @@ if (requireNamespace("ggplot2", quietly = TRUE) && nrow(summary) > 0) {
 
 cat("\nCross-model selector net table:\n")
 print(wide, row.names = FALSE)
+cat("\nMain manuscript table:\n")
+print(main_table, row.names = FALSE)
 cat("\nCross-model selector contrasts:\n")
 print(contrasts, row.names = FALSE)
