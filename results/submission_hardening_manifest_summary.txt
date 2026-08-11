@@ -1,0 +1,14 @@
+Generated: 2026-08-12 02:58:29 CST
+Git commit: a5f8dcfe4af8e4fb7c5d7843b6ddfde1837de8cd
+Git short commit: a5f8dcfe4af8
+Working tree tracked changes: no
+Manifest rows: 37
+Missing expected outputs: 0
+Manuscript build status: success
+Manuscript PDF newer than sources: TRUE
+Manuscript clean build verified: TRUE
+TeX engine available: TRUE
+PDF visual audit status: not_requested
+Claim-audit rows: 13
+Numeric claim-audit PASS/WARN/FAIL: 13/6/0
+OpenSSL SHA256 available: TRUE

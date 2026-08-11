@@ -1,0 +1,156 @@
+{
+  "created_at": "2026-08-07T18:01:28+0800",
+  "repo_root": "C:/Users/Public/Celltype",
+  "git_commit": "5c52e931c992",
+  "git_status_short": [" M README.md", " M benchmarks/external_validation_protocol.md", " M benchmarks/reproduce_submission_bundle.R", "?? benchmarks/analyse_biological_validation.R"],
+  "r_version": "R version 4.5.3 (2026-03-11 ucrt)",
+  "platform": "x86_64-w64-mingw32",
+  "run_tests": false,
+  "all_steps_succeeded": true,
+  "all_expected_outputs_present": true,
+  "required_inputs": [
+    {
+      "RelativePath": "results/external_validation_results_full.csv",
+      "Exists": true,
+      "FileSizeBytes": 66658,
+      "MD5": "584287d6380cd4e3309afc8403246f91",
+      "_row": "results/external_validation_results_full.csv"
+    },
+    {
+      "RelativePath": "results/external_validation_refinement_behavior.csv",
+      "Exists": true,
+      "FileSizeBytes": 43746,
+      "MD5": "f1391558c3e6e0a4992b5aa9452b2e92",
+      "_row": "results/external_validation_refinement_behavior.csv"
+    },
+    {
+      "RelativePath": "results/external_validation_confidence_quality.csv",
+      "Exists": true,
+      "FileSizeBytes": 60469,
+      "MD5": "7c7eb142089b3f4421fd0d8dd0e4d46d",
+      "_row": "results/external_validation_confidence_quality.csv"
+    },
+    {
+      "RelativePath": "results/benchmark_debug",
+      "Exists": true,
+      "FileSizeBytes": 196608,
+      "_row": "results/benchmark_debug"
+    },
+    {
+      "RelativePath": "results/reliability_model_v1.1_error.rds",
+      "Exists": true,
+      "FileSizeBytes": 45736,
+      "MD5": "5f715b80ebe3ed6946559078aca70e92",
+      "_row": "results/reliability_model_v1.1_error.rds"
+    },
+    {
+      "RelativePath": "benchmarks/external_validation_manifest.csv",
+      "Exists": true,
+      "FileSizeBytes": 6441,
+      "MD5": "544eecda576029f4a5c3950f0bd63755",
+      "_row": "benchmarks/external_validation_manifest.csv"
+    },
+    {
+      "RelativePath": "inst/extdata/reliability_spec_v1.0.json",
+      "Exists": true,
+      "FileSizeBytes": 11433,
+      "MD5": "16e76e85220e3201838600f6a906243b",
+      "_row": "inst/extdata/reliability_spec_v1.0.json"
+    },
+    {
+      "RelativePath": "inst/extdata/reliability_model_spec_v1.1.json",
+      "Exists": true,
+      "FileSizeBytes": 2716,
+      "MD5": "d76762da6bd200333cd974c96f040c31",
+      "_row": "inst/extdata/reliability_model_spec_v1.1.json"
+    }
+  ],
+  "generated_outputs": [
+    {
+      "RelativePath": "results/external_validation_meta_analysis_selector_pooled_effects.csv",
+      "Exists": true,
+      "FileSizeBytes": 5893,
+      "MD5": "1d9b946ceedd5b069c0e7c2b3c75fbaa",
+      "_row": "results/external_validation_meta_analysis_selector_pooled_effects.csv"
+    },
+    {
+      "RelativePath": "results/external_validation_meta_analysis_selector_contrast_pooled_effects.csv",
+      "Exists": true,
+      "FileSizeBytes": 1845,
+      "MD5": "1f5a27cc971b6b96f03ba168b2d9c4c9",
+      "_row": "results/external_validation_meta_analysis_selector_contrast_pooled_effects.csv"
+    },
+    {
+      "RelativePath": "results/external_validation_robustness_dataset_scorecard.csv",
+      "Exists": true,
+      "FileSizeBytes": 1147,
+      "MD5": "810b7c123435499caae9b871684e07c6",
+      "_row": "results/external_validation_robustness_dataset_scorecard.csv"
+    },
+    {
+      "RelativePath": "results/external_validation_selector_inference_paired_selector_inference.csv",
+      "Exists": true,
+      "FileSizeBytes": 16613,
+      "MD5": "af910113a5e22ffa8c853c0ce52f7f95",
+      "_row": "results/external_validation_selector_inference_paired_selector_inference.csv"
+    },
+    {
+      "RelativePath": "results/biological_validation_cluster_biological_validation.csv",
+      "Exists": true,
+      "FileSizeBytes": 814190,
+      "MD5": "2b781dd63136ce78a9594bbd4871f140",
+      "_row": "results/biological_validation_cluster_biological_validation.csv"
+    },
+    {
+      "RelativePath": "results/biological_validation_summary_by_method.csv",
+      "Exists": true,
+      "FileSizeBytes": 1655,
+      "MD5": "b1c685fddbf7ad6548c33c3961f1f5d2",
+      "_row": "results/biological_validation_summary_by_method.csv"
+    },
+    {
+      "RelativePath": "results/biological_validation_corrected_clusters.csv",
+      "Exists": true,
+      "FileSizeBytes": 16725,
+      "MD5": "dd6af0007426d36501477e6f89f38ac1",
+      "_row": "results/biological_validation_corrected_clusters.csv"
+    },
+    {
+      "RelativePath": "results/biological_validation_failure_taxonomy.csv",
+      "Exists": true,
+      "FileSizeBytes": 3884,
+      "MD5": "4583dba3d5365c26dd8f03a2f3bcb9ab",
+      "_row": "results/biological_validation_failure_taxonomy.csv"
+    },
+    {
+      "RelativePath": "results/universal_reliability_transfer_risk_transfer_metrics.csv",
+      "Exists": true,
+      "FileSizeBytes": 1054,
+      "MD5": "ddb5daad832b5d9338fa95eb888521f2",
+      "_row": "results/universal_reliability_transfer_risk_transfer_metrics.csv"
+    },
+    {
+      "RelativePath": "results/universal_reliability_transfer_selector_summary_by_model.csv",
+      "Exists": true,
+      "FileSizeBytes": 1673,
+      "MD5": "70929c3e6ebdf79cc9cae9257c9a534a",
+      "_row": "results/universal_reliability_transfer_selector_summary_by_model.csv"
+    },
+    {
+      "RelativePath": "results/benchmark_release_manifest.csv",
+      "Exists": true,
+      "FileSizeBytes": 158340,
+      "MD5": "1599c160dc5536b6e28687b29f39d258",
+      "_row": "results/benchmark_release_manifest.csv"
+    },
+    {
+      "RelativePath": "results/benchmark_release_manifest_summary.csv",
+      "Exists": true,
+      "FileSizeBytes": 411,
+      "MD5": "59669a9f4adb9dd9fb5ce66a24968e64",
+      "_row": "results/benchmark_release_manifest_summary.csv"
+    }
+  ],
+  "steps_csv": "results/submission_reproducibility_steps.csv",
+  "artifacts_csv": "results/submission_reproducibility_artifacts.csv"
+}

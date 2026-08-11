@@ -1,0 +1,39 @@
+"Step","Command","StartedAt","FinishedAt","ExitStatus","Output"
+"external_meta_analysis","C:/PROGRA~1/R/R-45~1.3/bin/x64/Rscript benchmarks/analyse_external_validation_meta_analysis.R results/external_validation_refinement_behavior.csv results/external_validation_confidence_quality.csv results/external_validation_meta_analysis","2026-08-07T17:58:37+0800","2026-08-07T17:58:39+0800",0,"During startup - Warning messages:
+1: Setting LC_COLLATE=C.UTF-8 failed 
+2: Setting LC_CTYPE=C.UTF-8 failed 
+3: Setting LC_MONETARY=C.UTF-8 failed 
+4: Setting LC_TIME=C.UTF-8 failed "
+"external_robustness","C:/PROGRA~1/R/R-45~1.3/bin/x64/Rscript benchmarks/analyse_external_validation_robustness.R results/external_validation_results_full.csv results/external_validation_refinement_behavior.csv results/external_validation_confidence_quality.csv results/external_validation_robustness","2026-08-07T17:58:39+0800","2026-08-07T17:58:42+0800",0,"During startup - Warning messages:
+1: Setting LC_COLLATE=C.UTF-8 failed 
+2: Setting LC_CTYPE=C.UTF-8 failed 
+3: Setting LC_MONETARY=C.UTF-8 failed 
+4: Setting LC_TIME=C.UTF-8 failed "
+"external_selector_inference","C:/PROGRA~1/R/R-45~1.3/bin/x64/Rscript benchmarks/analyse_selector_inference.R results/external_validation_refinement_behavior.csv results/external_validation_selector_inference","2026-08-07T17:58:42+0800","2026-08-07T17:58:53+0800",0,"During startup - Warning messages:
+1: Setting LC_COLLATE=C.UTF-8 failed 
+2: Setting LC_CTYPE=C.UTF-8 failed 
+3: Setting LC_MONETARY=C.UTF-8 failed 
+4: Setting LC_TIME=C.UTF-8 failed 
+Wrote paired selector inference to results/external_validation_selector_inference_paired_selector_inference.csv"
+"biological_validation","C:/PROGRA~1/R/R-45~1.3/bin/x64/Rscript benchmarks/analyse_biological_validation.R results/benchmark_debug benchmarks/external_validation_manifest.csv results/biological_validation","2026-08-07T17:58:53+0800","2026-08-07T18:01:17+0800",0,"During startup - Warning messages:
+1: Setting LC_COLLATE=C.UTF-8 failed 
+2: Setting LC_CTYPE=C.UTF-8 failed 
+3: Setting LC_MONETARY=C.UTF-8 failed 
+4: Setting LC_TIME=C.UTF-8 failed 
+Loading Cell Ontology from: data/cl.obo
+Ontology loaded successfully with 3437 terms
+Wrote biological validation tables with 990 cluster-method rows."
+"universal_reliability_transfer","C:/PROGRA~1/R/R-45~1.3/bin/x64/Rscript benchmarks/analyse_universal_reliability_transfer.R results/benchmark_debug results/reliability_model_v1.1_error.rds results/universal_reliability_transfer deepseek-chat","2026-08-07T18:01:17+0800","2026-08-07T18:01:24+0800",0,"During startup - Warning messages:
+1: Setting LC_COLLATE=C.UTF-8 failed 
+2: Setting LC_CTYPE=C.UTF-8 failed 
+3: Setting LC_MONETARY=C.UTF-8 failed 
+4: Setting LC_TIME=C.UTF-8 failed 
+Warning message:
+glm.fit: fitted probabilities numerically 0 or 1 occurred "
+"benchmark_release_manifest","C:/PROGRA~1/R/R-45~1.3/bin/x64/Rscript benchmarks/build_benchmark_release_manifest.R results/benchmark_release_manifest.csv false","2026-08-07T18:01:24+0800","2026-08-07T18:01:27+0800",0,"During startup - Warning messages:
+1: Setting LC_COLLATE=C.UTF-8 failed 
+2: Setting LC_CTYPE=C.UTF-8 failed 
+3: Setting LC_MONETARY=C.UTF-8 failed 
+4: Setting LC_TIME=C.UTF-8 failed 
+Wrote benchmark release manifest to results/benchmark_release_manifest.csv
+Wrote benchmark release summary to results/benchmark_release_manifest_summary.csv"

@@ -28,9 +28,6 @@ benchmark_results.csv
 benchmark_plot.pdf
 benchmark_*.pdf
 benchmark_*.csv
-!paper/sn-article-template/benchmark_*.pdf
-!paper/sn-article-template/benchmark_*.csv
-!paper/oup-authoring-template/oup-authoring-template/Fig/benchmark_*.pdf
 Figure*_*.tiff
 global_benchmark_comparison.*
 unmatched_celltypes.log
@@ -40,7 +37,54 @@ annotation_*.html
 confidence_plot.png
 benchmark_cache/
 benchmark_debug/
-results/
+
+# Result files: ignore local scratch outputs by default, but keep the
+# frozen manuscript result bundle cited in the BMC Bioinformatics submission.
+/results/*
+!/results/
+!/results/README.md
+!/results/final_benchmark_table.csv
+!/results/benchmark_results_full.csv
+!/results/benchmark_results_summary.csv
+!/results/dataset_summary.csv
+!/results/cluster_summary.csv
+!/results/benchmark_pairwise_wilcoxon.csv
+!/results/benchmark_friedman_tests.csv
+!/results/benchmark_llm_stability.csv
+!/results/benchmark_manifest.txt
+!/results/ablation_confidence_quality.csv
+!/results/ablation_reliability_bins.csv
+!/results/ablation_refinement_behavior.csv
+!/results/refinement_efficiency_summary.csv
+!/results/refinement_selector_pairwise_wilcoxon.csv
+!/results/refinement_efficiency.pdf
+!/results/celltypist_native_cell_metrics.csv
+!/results/openai_gpt5_3rep_selector_summary.csv
+!/results/openai_gpt5_3rep_performance_summary.csv
+!/results/openai_gpt5_3rep_hash_audit.csv
+!/results/openai_gpt5_fullrefined_harmful_revisions.csv
+!/results/cross_model_selector_summary.csv
+!/results/cross_model_selector_net_table.csv
+!/results/cross_model_selector_main_table.csv
+!/results/cross_model_selector_main_table.tex
+!/results/cross_model_selector_contrasts.csv
+!/results/cross_model_selector_net_efficiency.pdf
+!/results/external_validation_results_full.csv
+!/results/external_validation_refinement_behavior.csv
+!/results/external_validation_meta_analysis_selector_forest.pdf
+!/results/biological_validation_summary_by_method.csv
+!/results/biological_validation_failure_taxonomy.csv
+!/results/benchmark_release_manifest.csv
+!/results/submission_build_audit.csv
+!/results/submission_pdf_visual_audit.csv
+!/results/submission_numeric_claim_audit.csv
+!/results/submission_hardening_manifest.csv
+!/results/submission_hardening_manifest_summary.txt
+!/results/submission_reproducibility_report.json
+!/results/submission_reproducibility_steps.csv
+!/results/submission_reproducibility_artifacts.csv
+!/results/sessionInfo.txt
+!/results/submission_hardening_sessionInfo.txt
 
 # Temporary files
 *.tmp

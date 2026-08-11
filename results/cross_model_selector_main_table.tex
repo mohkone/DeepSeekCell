@@ -1,0 +1,19 @@
+\begin{table*}[!t]
+\centering
+\caption{Cross-model synthesis of selective-refinement behaviour. Net efficiency is \((N_{wrong\to correct}-N_{correct\to wrong})/N_{refined}\). Scope is reported explicitly because DeepSeek/GPT-5 and local Ollama backends were evaluated under complementary benchmark designs. Random-k and Confidence-k entries show net corrections divided by the number refined under that selector; the DeepSeek and GPT-5 development rows are compute-matched to Evidence-k. NE, not evaluated.}
+\label{tab:cross-model-selector}
+\small
+\resizebox{0.94\textwidth}{!}{%
+\begin{tabular}{llrrrrlll}
+\toprule
+Backend & Scope & $n_{ref}$ & W$\to$C & C$\to$W & Net eff. & Random & Confidence & Full\\
+\midrule
+DeepSeek & Dev., 1 rep. &  1 &  1 & 0 & 100.0\% & 0/1 & 0/1 & 1\\
+GPT-5 & Dev., 3 reps &  4 &  3 & 0 & 75.0\% & 0/4 & 0/4 & -2\\
+Gemma2-2B & Local pilot & 11 & 10 & 0 & 90.9\% & 5/11 & 4/11 & NE\\
+Llama 3.2 & Local pilot &  6 &  6 & 0 & 100.0\% & 2/6 & 3/5 & NE\\
+Mistral & Local pilot &  6 &  5 & 0 & 83.3\% & 3/6 & 3/6 & NE\\
+\bottomrule
+\end{tabular}
+}
+\end{table*}

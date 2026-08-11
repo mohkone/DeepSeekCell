@@ -564,10 +564,14 @@ source("benchmarks/run_benchmark.R")
 main(n_replicates = 3)
 ```
 
-Generated benchmark outputs are ignored by default through `.gitignore` and `.Rbuildignore`.
-Key outputs include `results/benchmark_results_summary.csv`,
-`results/benchmark_results_full.csv`, `results/final_benchmark_table.csv`, `results/dataset_summary.csv`,
-`results/cluster_summary.csv`, and `results/benchmark_manifest.txt`.
+Most generated benchmark outputs are ignored by default through `.gitignore` and
+`.Rbuildignore`. The curated BMC Bioinformatics manuscript result bundle is
+tracked under `results/` so that the repository contains the frozen outputs
+cited in the manuscript availability statement. Key tracked outputs include
+`results/benchmark_results_summary.csv`,
+`results/benchmark_results_full.csv`, `results/final_benchmark_table.csv`,
+`results/dataset_summary.csv`, `results/cluster_summary.csv`, and
+`results/benchmark_manifest.txt`.
 
 ## Reproducibility Notes
 

@@ -1,0 +1,6 @@
+"Selector","Blocks","NRefined","WrongToCorrect","CorrectToWrong","NetCorrections","CorrectionEfficiency","NetCorrectionEfficiency","HarmRate","RefinementTokens","RefinementPromptTokens","RefinementCompletionTokens","RefinementRuntimeSec","RefinementCostUSD","SecondPassCalls"
+"evidence-k",18,4,3,0,3,0.75,0.75,0,2185,1766,419,6.89937496185303,0.0063975,4
+"confidence-k",18,4,0,0,0,0,0,0,2164,1700,464,8.72418689727783,0.006765,4
+"random-k",18,4,0,0,0,0,0,0,2185,1723,462,9.06237697601318,0.00677375,4
+"evidence-no-ontology-k",18,4,3,1,2,0.75,0.5,0.25,2157,1744,413,7.42149186134339,0.00631,4
+"full",18,249,7,9,-2,0.0281124497991968,-0.00803212851405622,0.036144578313253,72734,53553,19181,186.013600587845,0.25875125,18

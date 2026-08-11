@@ -1,0 +1,18 @@
+"Source","Scope","Model","LLMModelID","Comparison","DeltaNetCorrections","DeltaNetCorrectionEfficiency","DeltaHarmRate","EvidenceRefined","ComparatorRefined"
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","Evidence-k vs Confidence-k",1,1,0,1,1
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","Evidence-k vs FullRefined",0,0.987951807228916,-0.0120481927710843,1,83
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","Evidence-k vs NoOntology-k",0,0,0,1,1
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","Evidence-k vs Random-k",1,1,0,1,1
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","Evidence-k vs Confidence-k",3,0.75,0,4,4
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","Evidence-k vs FullRefined",5,0.758032128514056,-0.036144578313253,4,249
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","Evidence-k vs NoOntology-k",1,0.25,-0.25,4,4
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","Evidence-k vs Random-k",3,0.75,0,4,4
+"ollama_multimodel_pilot","local multimodel pilot datasets","Gemma2-2B","gemma2:2b","Evidence-k vs Confidence-k",6,0.545454545454545,0,11,11
+"ollama_multimodel_pilot","local multimodel pilot datasets","Gemma2-2B","gemma2:2b","Evidence-k vs NoOntology-k",5,0.0757575757575757,0,11,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Gemma2-2B","gemma2:2b","Evidence-k vs Random-k",5,0.454545454545455,0,11,11
+"ollama_multimodel_pilot","local multimodel pilot datasets","Llama 3.2","llama3.2:latest","Evidence-k vs Confidence-k",3,0.4,0,6,5
+"ollama_multimodel_pilot","local multimodel pilot datasets","Llama 3.2","llama3.2:latest","Evidence-k vs NoOntology-k",3,0.25,0,6,4
+"ollama_multimodel_pilot","local multimodel pilot datasets","Llama 3.2","llama3.2:latest","Evidence-k vs Random-k",4,0.666666666666667,0,6,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Mistral","mistral:latest","Evidence-k vs Confidence-k",2,0.333333333333333,0,6,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Mistral","mistral:latest","Evidence-k vs NoOntology-k",0,0,0,6,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Mistral","mistral:latest","Evidence-k vs Random-k",2,0.333333333333333,0,6,6

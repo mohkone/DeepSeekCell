@@ -1,0 +1,11 @@
+"MethodSet","Metric","Methods","Blocks","FriedmanChiSquared","PValue"
+"deepseekcell_refinement_controls","ARI","DeepSeek-Plain;DeepSeekCell-RandomK;DeepSeekCell-ConfidenceK;DeepSeekCell-NoOntologyK;DeepSeekCell-SelfRefined;DeepSeekCell-FullRefined",6,6.53846153846154,0.257288980874547
+"deepseekcell_refinement_controls","MacroF1","DeepSeek-Plain;DeepSeekCell-RandomK;DeepSeekCell-ConfidenceK;DeepSeekCell-NoOntologyK;DeepSeekCell-SelfRefined;DeepSeekCell-FullRefined",6,7.14285714285714,0.210230808863486
+"deepseekcell_refinement_controls","Accuracy","DeepSeek-Plain;DeepSeekCell-RandomK;DeepSeekCell-ConfidenceK;DeepSeekCell-NoOntologyK;DeepSeekCell-SelfRefined;DeepSeekCell-FullRefined",6,5,0.415880186995508
+"deepseekcell_refinement_controls","CladeAcc","DeepSeek-Plain;DeepSeekCell-RandomK;DeepSeekCell-ConfidenceK;DeepSeekCell-NoOntologyK;DeepSeekCell-SelfRefined;DeepSeekCell-FullRefined",6,3,0.699985835878628
+"deepseekcell_refinement_controls","RuntimeSec","DeepSeek-Plain;DeepSeekCell-RandomK;DeepSeekCell-ConfidenceK;DeepSeekCell-NoOntologyK;DeepSeekCell-SelfRefined;DeepSeekCell-FullRefined",6,25.4545454545455,0.000113815273212921
+"all_datasets","ARI","DeepSeekCell-SelfRefined;scType;SingleR;scmap",6,8.59322033898305,0.0352178990163783
+"all_datasets","MacroF1","DeepSeekCell-SelfRefined;scType;SingleR;scmap",6,12,0.00738316050535977
+"all_datasets","Accuracy","DeepSeekCell-SelfRefined;scType;SingleR;scmap",6,9.86538461538461,0.019745766422833
+"all_datasets","CladeAcc","DeepSeekCell-SelfRefined;scType;SingleR;scmap",6,5.37931034482759,0.146038061991208
+"all_datasets","RuntimeSec","DeepSeekCell-SelfRefined;scType;SingleR;scmap",6,16.4,0.000938742055045042

@@ -1,0 +1,23 @@
+"Source","Scope","Model","LLMModelID","Selector","Blocks","Datasets","Replicates","NRefined","WrongToCorrect","CorrectToWrong","NetCorrections","CorrectionEfficiency","NetCorrectionEfficiency","HarmRate","RefinementTokens","RefinementRuntimeSec","RefinementCostUSD","SecondPassCalls"
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","Confidence-k",6,6,1,1,0,0,0,0,0,0,528,1.66345977783203,8.89e-05,1
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","Evidence-k",6,6,1,1,1,0,1,1,1,0,578,2.12016105651855,9.744e-05,1
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","FullRefined",6,6,1,83,2,1,1,0.0240963855421687,0.0120481927710843,0.0120481927710843,26362,45.9404361248016,0.00481432,6
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","NoOntology-k",6,6,1,1,1,0,1,1,1,0,583,1.75019001960754,9.94e-05,1
+"development_benchmark","six development datasets; cached paired ablation","DeepSeek","deepseek-chat","Random-k",6,6,1,1,0,0,0,0,0,0,508,1.19033885002136,8.386e-05,1
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","Confidence-k",18,6,3,4,0,0,0,0,0,0,2164,8.72418689727783,0.006765,4
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","Evidence-k",18,6,3,4,3,0,3,0.75,0.75,0,2185,6.89937496185303,0.0063975,4
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","FullRefined",18,6,3,249,7,9,-2,0.0281124497991968,-0.00803212851405622,0.036144578313253,72734,186.013600587845,0.25875125,18
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","NoOntology-k",18,6,3,4,3,1,2,0.75,0.5,0.25,2157,7.42149186134339,0.00631,4
+"development_benchmark","six development datasets; cached paired ablation","GPT-5","gpt-5","Random-k",18,6,3,4,0,0,0,0,0,0,2185,9.06237697601318,0.00677375,4
+"ollama_multimodel_pilot","local multimodel pilot datasets","Gemma2-2B","gemma2:2b","Confidence-k",3,3,1,11,4,0,4,0.363636363636364,0.363636363636364,0,3775,247.581624984741,0,11
+"ollama_multimodel_pilot","local multimodel pilot datasets","Gemma2-2B","gemma2:2b","Evidence-k",3,3,1,11,10,0,10,0.909090909090909,0.909090909090909,0,3818,291.60493683815,0,11
+"ollama_multimodel_pilot","local multimodel pilot datasets","Gemma2-2B","gemma2:2b","NoOntology-k",1,1,1,6,5,0,5,0.833333333333333,0.833333333333333,0,1962,87.6130609512329,0,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Gemma2-2B","gemma2:2b","Random-k",3,3,1,11,5,0,5,0.454545454545455,0.454545454545455,0,3599,253.698393583298,0,11
+"ollama_multimodel_pilot","local multimodel pilot datasets","Llama 3.2","llama3.2:latest","Confidence-k",3,3,1,5,3,0,3,0.6,0.6,0,1848,77.2858622074127,0,5
+"ollama_multimodel_pilot","local multimodel pilot datasets","Llama 3.2","llama3.2:latest","Evidence-k",3,3,1,6,6,0,6,1,1,0,2104,91.4755611419677,0,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Llama 3.2","llama3.2:latest","NoOntology-k",1,1,1,4,3,0,3,0.75,0.75,0,1312,26.9501340389252,0,4
+"ollama_multimodel_pilot","local multimodel pilot datasets","Llama 3.2","llama3.2:latest","Random-k",3,3,1,6,2,0,2,0.333333333333333,0.333333333333333,0,2014,109.858222961426,0,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Mistral","mistral:latest","Confidence-k",1,1,1,6,3,0,3,0.5,0.5,0,2032,250.428139925003,0,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Mistral","mistral:latest","Evidence-k",1,1,1,6,5,0,5,0.833333333333333,0.833333333333333,0,2156,293.384822845459,0,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Mistral","mistral:latest","NoOntology-k",1,1,1,6,5,0,5,0.833333333333333,0.833333333333333,0,2409,167.614100217819,0,6
+"ollama_multimodel_pilot","local multimodel pilot datasets","Mistral","mistral:latest","Random-k",1,1,1,6,3,0,3,0.5,0.5,0,1999,257.680979013443,0,6
