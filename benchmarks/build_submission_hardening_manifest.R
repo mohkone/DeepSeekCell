@@ -97,9 +97,27 @@ run_cmd_status <- function(command, args = character(), wd = NULL) {
   list(status = status, output = paste(out, collapse = "\n"))
 }
 
+find_executable <- function(name) {
+  path <- Sys.which(name)
+  if (nzchar(path)) return(unname(path))
+
+  exe <- if (.Platform$OS.type == "windows") paste0(name, ".exe") else name
+  candidates <- unique(c(
+    file.path(Sys.getenv("TINYTeX", unset = ""), "bin", "windows", exe),
+    file.path(Sys.getenv("TINYTEX_ROOT", unset = ""), "bin", "windows", exe),
+    file.path(Sys.getenv("APPDATA", unset = ""), "TinyTeX", "bin", "windows", exe),
+    file.path(Sys.getenv("LOCALAPPDATA", unset = ""), "TinyTeX", "bin", "windows", exe),
+    file.path("C:", "ProgramData", "TinyTeX", "bin", "windows", exe),
+    file.path(Sys.getenv("HOME", unset = ""), "TinyTeX", "bin", "windows", exe)
+  ))
+  candidates <- candidates[nzchar(candidates)]
+  existing <- candidates[file.exists(candidates)]
+  if (length(existing) > 0) existing[[1]] else ""
+}
+
 build_clean_manuscript <- function(tex_path, pdf_path) {
-  tex_engine <- Sys.which("pdflatex")
-  bibtex_engine <- Sys.which("bibtex")
+  tex_engine <- find_executable("pdflatex")
+  bibtex_engine <- find_executable("bibtex")
   clean_build_requested <- tolower(Sys.getenv("DEEPSEEKCELL_CLEAN_BUILD", unset = "false")) %in%
     c("1", "true", "yes", "y")
 
@@ -152,9 +170,13 @@ build_clean_manuscript <- function(tex_path, pdf_path) {
   commands[[length(commands) + 1]] <- run_cmd_status(tex_engine, c("-interaction=nonstopmode", "-halt-on-error", basename(tex_path)), wd = wd)
 
   output <- paste(vapply(commands, `[[`, character(1), "output"), collapse = "\n\n---\n\n")
-  utils::writeLines(output, file.path(results_dir, "submission_clean_build.log"))
+  writeLines(output, file.path(results_dir, "submission_clean_build.log"))
 
   failed <- any(vapply(commands, function(x) x$status != 0, logical(1)))
+  generated_pdf <- file.path(wd, paste0(base, ".pdf"))
+  if (!failed && file.exists(generated_pdf) && !identical(normalizePath(generated_pdf, winslash = "/", mustWork = FALSE), normalizePath(pdf_path, winslash = "/", mustWork = FALSE))) {
+    file.copy(generated_pdf, pdf_path, overwrite = TRUE)
+  }
   log_path <- file.path(wd, paste0(base, ".log"))
   log_text <- if (file.exists(log_path)) paste(readLines(log_path, warn = FALSE), collapse = "\n") else ""
   unresolved <- grepl(

@@ -228,6 +228,10 @@ write_latex_table <- function(x, path) {
 
   escape <- function(value) {
     value <- as.character(value)
+    value[value == "Not evaluated"] <- "NE"
+    value <- gsub("Development, 1 replicate", "Dev., 1 rep.", value, fixed = TRUE)
+    value <- gsub("Development, 3 replicates", "Dev., 3 reps", value, fixed = TRUE)
+    value <- gsub("Local multimodel pilot", "Local pilot", value, fixed = TRUE)
     value <- gsub("\\\\", "\\\\textbackslash{}", value)
     value <- gsub("&", "\\\\&", value)
     value <- gsub("%", "\\\\%", value)
@@ -238,11 +242,13 @@ write_latex_table <- function(x, path) {
   header <- c(
     "\\begin{table*}[!t]",
     "\\centering",
-    "\\caption{Cross-model synthesis of selective-refinement behaviour. Net efficiency is \\((N_{wrong\\to correct}-N_{correct\\to wrong})/N_{refined}\\). Scope is reported explicitly because DeepSeek/GPT-5 and local Ollama backends were evaluated under complementary benchmark designs. Random-k and Confidence-k entries show net corrections divided by the number refined under that selector; the DeepSeek and GPT-5 development rows are compute-matched to Evidence-k.}",
+    "\\caption{Cross-model synthesis of selective-refinement behaviour. Net efficiency is \\((N_{wrong\\to correct}-N_{correct\\to wrong})/N_{refined}\\). Scope is reported explicitly because DeepSeek/GPT-5 and local Ollama backends were evaluated under complementary benchmark designs. Random-k and Confidence-k entries show net corrections divided by the number refined under that selector; the DeepSeek and GPT-5 development rows are compute-matched to Evidence-k. NE, not evaluated.}",
     "\\label{tab:cross-model-selector}",
+    "\\small",
+    "\\resizebox{0.94\\textwidth}{!}{%",
     "\\begin{tabular}{llrrrrlll}",
     "\\toprule",
-    "Backend & Scope & Evidence refined & W$\\to$C & C$\\to$W & Net efficiency & Random-k net & Confidence-k net & FullRefined net\\\\",
+    "Backend & Scope & $n_{ref}$ & W$\\to$C & C$\\to$W & Net eff. & Random & Confidence & Full\\\\",
     "\\midrule"
   )
   body <- apply(x, 1, function(row) {
@@ -254,6 +260,7 @@ write_latex_table <- function(x, path) {
   footer <- c(
     "\\bottomrule",
     "\\end{tabular}",
+    "}",
     "\\end{table*}"
   )
   writeLines(c(header, body, footer), path)
