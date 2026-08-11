@@ -4,7 +4,6 @@
 # This script performs no API calls. It only reads completed benchmark CSVs and
 # summarizes whether evidence-guided selection shows consistent qualitative
 # behavior across evaluated LLM backends and complementary evaluation scopes.
-# backends and evaluation scopes.
 
 `%||%` <- function(x, y) {
   if (is.null(x) || length(x) == 0) y else x
